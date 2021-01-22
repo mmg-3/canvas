@@ -2,74 +2,53 @@
 
 namespace Canvas\Tests\Models;
 
-use Canvas\Http\Middleware\Session;
 use Canvas\Models\Post;
 use Canvas\Models\Tag;
 use Canvas\Models\Topic;
-use Canvas\Models\UserMeta;
+use Canvas\Models\User;
 use Canvas\Models\View;
 use Canvas\Models\Visit;
 use Canvas\Tests\TestCase;
 use Carbon\Carbon;
-use Illuminate\Auth\Middleware\Authorize;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 
+/**
+ * Class PostTest.
+ *
+ * @covers \Canvas\Models\Post
+ */
 class PostTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @return void
-     */
-    protected function setUp(): void
+    public function testDatesAreCarbonObjects(): void
     {
-        parent::setUp();
-
-        $this->withoutMiddleware([
-            Authorize::class,
-            Session::class,
-            VerifyCsrfToken::class,
-        ]);
+        $this->assertInstanceOf(Carbon::class, factory(Post::class)->create()->published_at);
     }
 
-    /** @test */
-    public function dates_are_carbon_objects()
+    public function testReadTimeAppendsToTheModel(): void
     {
-        $post = factory(Post::class)->create();
-
-        $this->assertInstanceOf(Carbon::class, $post->published_at);
+        $this->assertArrayHasKey('read_time', factory(Post::class)->create()->toArray());
     }
 
-    /** @test */
-    public function read_time_appends_to_the_model()
+    public function testMetaIsCastToArray(): void
     {
-        $post = factory(Post::class)->create();
-
-        $this->assertArrayHasKey('read_time', $post->toArray());
+        $this->assertIsArray(factory(Post::class)->create()->meta);
     }
 
-    /** @test */
-    public function meta_is_cast_to_an_array()
+    public function testPublishedAttribute(): void
     {
-        $post = factory(Post::class)->create();
-
-        $this->assertIsArray($post->meta);
-    }
-
-    /** @test */
-    public function published_attribute()
-    {
-        $post = factory(Post::class)->create([
+        $this->assertTrue(factory(Post::class)->create([
             'published_at' => now()->subDay(),
-        ]);
-
-        $this->assertTrue($post->published);
+        ])->published);
     }
 
-    /** @test */
-    public function read_time_attribute()
+    public function testReadTimeAttribute(): void
     {
         $post = factory(Post::class)->create();
 
@@ -81,8 +60,7 @@ class PostTest extends TestCase
         );
     }
 
-    /** @test */
-    public function popular_reading_times_attribute()
+    public function testPopularReadingTimesAttribute(): void
     {
         $post = factory(Post::class)->create();
 
@@ -100,76 +78,86 @@ class PostTest extends TestCase
         $this->assertIsArray($post->popularReadingTimes);
     }
 
-    /** @test */
-    public function posts_can_share_the_same_slug_with_unique_users()
+    public function testTopReferersAttribute(): void
+    {
+        $post = factory(Post::class)->create();
+
+        factory(View::class, 1)->create([
+            'post_id' => $post->id,
+            'referer' => null,
+            'created_at' => now()->subHour(),
+        ]);
+
+        factory(View::class, 1)->create([
+            'post_id' => $post->id,
+            'created_at' => now()->subHours(2),
+        ]);
+
+        $this->assertCount(2, $post->topReferers);
+        $this->assertIsArray($post->topReferers);
+    }
+
+    public function testPostsCanShareTheSameSlugWithUniqueUsers(): void
     {
         $data = [
             'slug' => 'a-new-post',
+            'title' => 'A new post',
         ];
 
-        $postOne = factory(Post::class)->create();
-        $response = $this->actingAs($postOne->user)->postJson("/canvas/api/posts/{$postOne->id}", $data);
+        $primaryPost = factory(Post::class)->create([
+            'user_id' => $this->admin->id,
+        ]);
+        $response = $this->actingAs($this->admin, 'canvas')->postJson("/canvas/api/posts/{$primaryPost->id}", $data);
 
         $this->assertDatabaseHas('canvas_posts', [
-            'id' => $response->decodeResponseJson('id'),
-            'slug' => $response->decodeResponseJson('slug'),
-            'user_id' => $response->decodeResponseJson('user_id'),
+            'id' => $response->original['id'],
+            'slug' => $response->original['slug'],
+            'user_id' => $response->original['user_id'],
         ]);
 
-        $postTwo = factory(Post::class)->create();
-        $response = $this->actingAs($postTwo->user)->postJson("/canvas/api/posts/{$postTwo->id}", $data);
+        $secondaryPost = factory(Post::class)->create([
+            'user_id' => $this->editor->id,
+        ]);
+        $response = $this->actingAs($this->editor, 'canvas')->postJson("/canvas/api/posts/{$secondaryPost->id}", $data);
 
         $this->assertDatabaseHas('canvas_posts', [
-            'id' => $response->decodeResponseJson('id'),
-            'slug' => $response->decodeResponseJson('slug'),
-            'user_id' => $response->decodeResponseJson('user_id'),
+            'id' => $response->original['id'],
+            'slug' => $response->original['slug'],
+            'user_id' => $response->original['user_id'],
         ]);
     }
 
-    /** @test */
-    public function tags_relationship()
+    public function testTagsRelationship(): void
     {
         $post = factory(Post::class)->create();
         $tag = factory(Tag::class)->create();
 
         $post->tags()->sync($tag);
 
+        $this->assertInstanceOf(BelongsToMany::class, $post->tags());
         $this->assertInstanceOf(Tag::class, $post->tags->first());
     }
 
-    /** @test */
-    public function topic_relationship()
+    public function testTopicRelationship(): void
     {
         $post = factory(Post::class)->create();
         $topic = factory(Topic::class)->create();
 
         $post->topic()->sync($topic);
 
+        $this->assertInstanceOf(BelongsToMany::class, $post->topic());
         $this->assertInstanceOf(Topic::class, $post->topic->first());
     }
 
-    /** @test */
-    public function user_relationship()
+    public function testUserRelationship(): void
     {
         $post = factory(Post::class)->create();
 
-        $this->assertInstanceOf(config('canvas.user'), $post->user);
+        $this->assertInstanceOf(BelongsTo::class, $post->user());
+        $this->assertInstanceOf(User::class, $post->user);
     }
 
-    /** @test */
-    public function userMeta_relationship()
-    {
-        $post = factory(Post::class)->create();
-
-        factory(UserMeta::class)->create([
-            'user_id' => $post->user->id,
-        ]);
-
-        $this->assertInstanceOf(UserMeta::class, $post->userMeta);
-    }
-
-    /** @test */
-    public function views_relationship()
+    public function testViewsRelationship(): void
     {
         $post = factory(Post::class)->create();
 
@@ -177,11 +165,11 @@ class PostTest extends TestCase
             'post_id' => $post->id,
         ]);
 
+        $this->assertInstanceOf(HasMany::class, $post->views());
         $this->assertInstanceOf(View::class, $post->views->first());
     }
 
-    /** @test */
-    public function visits_relationship()
+    public function testVisitsRelationship(): void
     {
         $post = factory(Post::class)->create();
 
@@ -189,50 +177,33 @@ class PostTest extends TestCase
             'post_id' => $post->id,
         ]);
 
+        $this->assertInstanceOf(HasMany::class, $post->visits());
         $this->assertInstanceOf(Visit::class, $post->visits->first());
     }
 
-    /** @test */
-    public function for_user_scope()
+    public function testPublishedScope(): void
     {
-        $user = factory(config('canvas.user'))->create();
-
-        $post = factory(Post::class)->create([
-            'user_id' => $user->id,
-        ]);
-
-        $this->assertEquals(1, $post->forUser($user)->count());
-
         factory(Post::class)->create([
-            'user_id' => 2,
+            'user_id' => $this->admin->id,
+            'published_at' => now()->subDay(),
         ]);
 
-        $meta = factory(UserMeta::class)->create([
-            'admin' => 1,
-        ]);
-
-        $this->assertEquals(2, $post->forUser($meta->user)->count());
+        $this->assertInstanceOf(Builder::class, resolve(Post::class)->published());
+        $this->assertCount(1, Post::published()->get());
     }
 
-    /** @test */
-    public function with_user_meta_scope()
+    public function testDraftScope(): void
     {
-        $user = factory(config('canvas.user'))->create();
-
-        $post = factory(Post::class)->create([
-            'user_id' => $user->id,
+        factory(Post::class)->create([
+            'user_id' => $this->admin->id,
+            'published_at' => now()->addDay(),
         ]);
 
-        $meta = factory(UserMeta::class)->create([
-            'user_id' => $user->id,
-        ]);
-
-        $this->assertSame($meta->id, $post->withUserMeta()->first()->userMeta->id);
-        $this->assertInstanceOf(UserMeta::class, Post::all()->first()->userMeta);
+        $this->assertInstanceOf(Builder::class, resolve(Post::class)->draft());
+        $this->assertCount(1, Post::draft()->get());
     }
 
-    /** @test */
-    public function it_will_detach_tags_and_topic_on_delete()
+    public function testDetachTaxonomyOnDelete(): void
     {
         $tag = factory(Tag::class)->create();
         $topic = factory(Topic::class)->create();

@@ -2,76 +2,58 @@
 
 namespace Canvas\Tests\Models;
 
-use Canvas\Http\Middleware\Session;
 use Canvas\Models\Post;
 use Canvas\Models\Tag;
-use Canvas\Models\UserMeta;
+use Canvas\Models\User;
 use Canvas\Tests\TestCase;
-use Illuminate\Auth\Middleware\Authorize;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Ramsey\Uuid\Uuid;
 
+/**
+ * Class TagTest.
+ *
+ * @covers \Canvas\Models\Tag
+ */
 class TagTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @return void
-     */
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->withoutMiddleware([
-            Authorize::class,
-            Session::class,
-            VerifyCsrfToken::class,
-        ]);
-    }
-
-    /** @test */
-    public function tags_can_share_the_same_slug_with_unique_users()
+    public function testTagsCanShareTheSameSlugWithUniqueUsers(): void
     {
         $data = [
-            'id' => Uuid::uuid4()->toString(),
             'name' => 'A new tag',
             'slug' => 'a-new-tag',
         ];
 
-        $tagOne = factory(Tag::class)->create();
-
-        factory(UserMeta::class)->create([
-            'user_id' => $tagOne->user->id,
-            'admin' => 1,
+        $primaryTag = factory(Tag::class)->create([
+            'user_id' => $this->admin->id,
         ]);
-
-        $response = $this->actingAs($tagOne->user)->postJson("/canvas/api/tags/{$tagOne->id}", $data);
+        $response = $this->actingAs($this->admin, 'canvas')->postJson("/canvas/api/tags/{$primaryTag->id}", $data);
 
         $this->assertDatabaseHas('canvas_tags', [
-            'id' => $response->decodeResponseJson('id'),
-            'slug' => $response->decodeResponseJson('slug'),
-            'user_id' => $response->decodeResponseJson('user_id'),
+            'id' => $response->original['id'],
+            'slug' => $response->original['slug'],
+            'user_id' => $response->original['user_id'],
         ]);
 
-        $tagTwo = factory(Tag::class)->create();
-
-        factory(UserMeta::class)->create([
-            'user_id' => $tagTwo->user->id,
-            'admin' => 1,
+        $secondaryAdmin = factory(User::class)->create([
+            'role' => User::ADMIN,
+        ]);
+        $secondaryTag = factory(Tag::class)->create([
+            'user_id' => $secondaryAdmin->id,
         ]);
 
-        $response = $this->actingAs($tagTwo->user)->postJson("/canvas/api/tags/{$tagTwo->id}", $data);
+        $response = $this->actingAs($secondaryAdmin, 'canvas')->postJson("/canvas/api/tags/{$secondaryTag->id}", $data);
 
         $this->assertDatabaseHas('canvas_tags', [
-            'id' => $response->decodeResponseJson('id'),
-            'slug' => $response->decodeResponseJson('slug'),
-            'user_id' => $response->decodeResponseJson('user_id'),
+            'id' => $response->original['id'],
+            'slug' => $response->original['slug'],
+            'user_id' => $response->original['user_id'],
         ]);
     }
 
-    /** @test */
-    public function posts_relationship()
+    public function testPostsRelationship(): void
     {
         $tag = factory(Tag::class)->create();
         $post = factory(Post::class)->create();
@@ -79,31 +61,19 @@ class TagTest extends TestCase
         $post->tags()->sync($tag);
 
         $this->assertCount(1, $post->tags);
+        $this->assertInstanceOf(BelongsToMany::class, $tag->posts());
         $this->assertInstanceOf(Post::class, $tag->posts->first());
     }
 
-    /** @test */
-    public function user_relationship()
+    public function testUserRelationship(): void
     {
         $tag = factory(Tag::class)->create();
 
-        $this->assertInstanceOf(config('canvas.user'), $tag->user);
+        $this->assertInstanceOf(BelongsTo::class, $tag->user());
+        $this->assertInstanceOf(User::class, $tag->user);
     }
 
-    /** @test */
-    public function userMeta_relationship()
-    {
-        $tag = factory(Tag::class)->create();
-
-        factory(UserMeta::class)->create([
-            'user_id' => $tag->user->id,
-        ]);
-
-        $this->assertInstanceOf(UserMeta::class, $tag->userMeta);
-    }
-
-    /** @test */
-    public function it_will_detach_posts_on_delete()
+    public function testDetachPostsOnDelete(): void
     {
         $tag = factory(Tag::class)->create();
         $post = factory(Post::class)->create();

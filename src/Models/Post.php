@@ -2,14 +2,13 @@
 
 namespace Canvas\Models;
 
+use Canvas\Canvas;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 
@@ -123,24 +122,7 @@ class Post extends Model
      */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(config('canvas.user', User::class));
-    }
-
-    /**
-     * Get the user meta relationship.
-     *
-     * @return HasOneThrough
-     */
-    public function userMeta(): HasOneThrough
-    {
-        return $this->hasOneThrough(
-            UserMeta::class,
-            config('canvas.user', User::class),
-            'id',       // Foreign key on users table...
-            'user_id',  // Foreign key on canvas_posts table...
-            'user_id',  // Local key on canvas_posts table...
-            'id'        // Local key on users table...
-        );
+        return $this->belongsTo(User::class);
     }
 
     /**
@@ -186,10 +168,12 @@ class Post extends Model
         // Divide by the average number of words per minute
         $minutes = ceil($words / 250);
 
+        // The user is optional since we append this attribute
+        // to every model and we may be creating a new one
         return sprintf('%d %s %s',
             $minutes,
-            Str::plural(trans('canvas::app.min', [], optional($this->userMeta)->locale), $minutes),
-            trans('canvas::app.read', [], optional($this->userMeta)->locale)
+            Str::plural(trans('canvas::app.min', [], optional($this->user)->locale), $minutes),
+            trans('canvas::app.read', [], optional($this->user)->locale)
         );
     }
 
@@ -253,10 +237,10 @@ class Post extends Model
         // Filter the view data to only include referrers
         $collection = collect();
         $data->each(function ($item, $key) use ($collection) {
-            if (empty(parse_url($item->referer)['host'])) {
-                $collection->push(trans('canvas::app.other', [], optional($this->userMeta)->locale));
+            if (empty(Canvas::trimUrl($item->referer))) {
+                $collection->push(trans('canvas::app.other', [], $this->user->locale));
             } else {
-                $collection->push(parse_url($item->referer)['host']);
+                $collection->push(Canvas::trimUrl($item->referer));
             }
         });
 
@@ -278,7 +262,7 @@ class Post extends Model
      * @param Builder $query
      * @return Builder
      */
-    public function scopePublished($query): Builder
+    public function scopePublished(Builder $query): Builder
     {
         return $query->where('published_at', '<=', now()->toDateTimeString());
     }
@@ -289,38 +273,9 @@ class Post extends Model
      * @param Builder $query
      * @return Builder
      */
-    public function scopeDraft($query): Builder
+    public function scopeDraft(Builder $query): Builder
     {
         return $query->where('published_at', null)->orWhere('published_at', '>', now()->toDateTimeString());
-    }
-
-    /**
-     * Scope a query to restrict access based on permissions.
-     *
-     * @param $query
-     * @param $user
-     * @return Builder
-     */
-    public function scopeForUser($query, $user): Builder
-    {
-        $meta = UserMeta::firstWhere('user_id', $user->id);
-
-        if (optional($meta)->admin) {
-            return $query;
-        } else {
-            return $query->where('user_id', $user->id);
-        }
-    }
-
-    /**
-     * Scope a query to eager load user meta.
-     *
-     * @param $query
-     * @return Builder
-     */
-    public function scopeWithUserMeta($query): Builder
-    {
-        return $query->with('userMeta');
     }
 
     /**
@@ -332,9 +287,9 @@ class Post extends Model
     {
         parent::boot();
 
-        static::deleting(function ($item) {
-            $item->tags()->detach();
-            $item->topic()->detach();
+        static::deleting(function (self $post) {
+            $post->tags()->detach();
+            $post->topic()->detach();
         });
     }
 }

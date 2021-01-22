@@ -1,9 +1,9 @@
 <template>
     <div class="modal fade" tabindex="-1" role="dialog" data-backdrop="static">
-        <div class="modal-dialog" ref="modal" role="document">
+        <div ref="modal" class="modal-dialog" role="document">
             <div class="modal-content">
                 <div v-if="!selectedImageUrl" class="modal-header d-flex align-items-center justify-content-between">
-                    <div v-if="unsplashKey" class="input-group align-items-center">
+                    <div v-if="settings.unsplash" class="input-group align-items-center">
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
                             viewBox="0 0 24 24"
@@ -20,9 +20,9 @@
                             v-model="searchKeyword"
                             type="text"
                             autofocus
-                            style="padding-left: 32px;"
+                            style="padding-left: 32px"
                             class="form-control border-0 bg-transparent"
-                            :placeholder="trans.app.search_free_photos"
+                            :placeholder="trans.search_free_photos"
                         />
                     </div>
 
@@ -49,13 +49,13 @@
                 </div>
                 <div class="modal-body pb-0">
                     <file-pond
+                        ref="pond"
                         v-if="!isSearchingUnsplash && !unsplashImages.length && isReadyToAcceptUploads"
                         name="editorImagePond"
-                        ref="pond"
                         max-files="1"
-                        :maxFileSize="maxUploadFilesize"
-                        :iconRemove="getRemoveIcon"
-                        :iconRetry="getRetryIcon"
+                        :max-file-size="settings.maxUpload"
+                        :icon-remove="getRemoveIcon"
+                        :icon-retry="getRetryIcon"
                         :label-idle="getPlaceholderLabel"
                         accepted-file-types="image/*"
                         :server="getServerOptions"
@@ -65,18 +65,18 @@
                         @removefile="removedFromFilePond"
                     />
 
-                    <div v-if="unsplashKey && !selectedImageUrl">
+                    <div v-if="settings.unsplash && !selectedImageUrl">
                         <div v-if="unsplashImages.length" class="card-columns mt-3">
                             <div
-                                v-for="(image, index) in unsplashImages"
                                 :key="index"
+                                v-for="(image, index) in unsplashImages"
                                 class="card border-0 bg-transparent"
                             >
                                 <img
                                     :src="image.urls.small"
                                     :alt="image.alt_description"
                                     class="card-img bg-transparent"
-                                    style="cursor: pointer;"
+                                    style="cursor: pointer"
                                     @click="selectUnsplashImage(image)"
                                 />
                             </div>
@@ -85,12 +85,12 @@
                         <infinite-loading
                             v-if="isSearchingUnsplash"
                             :identifier="infiniteId"
-                            @infinite="fetchUnsplashImages"
                             spinner="spiral"
+                            @infinite="fetchUnsplashImages"
                         >
-                            <span slot="no-more"></span>
+                            <span slot="no-more" />
                             <div slot="no-results" class="mb-3">
-                                {{ trans.app.no_images_found_for }} "{{ searchKeyword }}"
+                                {{ trans.no_images_found_for }} "{{ searchKeyword }}"
                             </div>
                         </infinite-loading>
                     </div>
@@ -128,15 +128,16 @@
 
                         <div class="col-12" :hidden="!selectedImagesForPond.length && !selectedImageUrl">
                             <div class="form-group row">
-                                <label class="font-weight-bold text-uppercase text-muted small">{{
-                                    trans.app.caption
+                                <label for="caption" class="font-weight-bold text-uppercase text-muted small">{{
+                                    trans.caption
                                 }}</label>
                                 <input
+                                    v-model="selectedImageCaption"
+                                    id="caption"
+                                    ref="caption"
                                     type="text"
                                     class="form-control border-0"
-                                    v-model="selectedImageCaption"
-                                    :placeholder="trans.app.type_caption_for_image"
-                                    ref="caption"
+                                    :placeholder="trans.type_caption_for_image"
                                 />
                             </div>
 
@@ -144,15 +145,15 @@
                                 class="form-group row mt-2"
                                 :hidden="!selectedImagesForPond.length && !selectedImageUrl"
                             >
-                                <label class="font-weight-bold text-uppercase text-muted small">{{
-                                    trans.app.layout
+                                <label for="layout" class="font-weight-bold text-uppercase text-muted small">{{
+                                    trans.layout
                                 }}</label>
-                                <select class="custom-select border-0" v-model="selectedImageLayout">
+                                <select v-model="selectedImageLayout" id="layout" class="custom-select border-0">
                                     <option value="default">
-                                        {{ trans.app.default_layout }}
+                                        {{ trans.default_layout }}
                                     </option>
                                     <option value="wide">
-                                        {{ trans.app.wide_image }}
+                                        {{ trans.wide_image }}
                                     </option>
                                 </select>
                             </div>
@@ -162,10 +163,10 @@
                 <div v-if="!unsplashImages.length" class="modal-footer">
                     <button
                         class="btn btn-link btn-block text-muted font-weight-bold text-decoration-none"
-                        @click="clickDone"
                         data-dismiss="modal"
+                        @click="clickDone"
                     >
-                        {{ trans.app.done }}
+                        {{ trans.done }}
                     </button>
                 </div>
             </div>
@@ -174,20 +175,21 @@
 </template>
 
 <script>
-import isEmpty from 'lodash/isEmpty';
-import debounce from 'lodash/debounce';
-import Unsplash, { toJson } from 'unsplash-js';
 import InfiniteLoading from 'vue-infinite-loading';
+import Unsplash, { toJson } from 'unsplash-js';
+import debounce from 'lodash/debounce';
+import isEmpty from 'lodash/isEmpty';
 import vueFilePond from 'vue-filepond';
 
-import 'filepond/dist/filepond.min.css';
 import 'filepond-plugin-image-preview/dist/filepond-plugin-image-preview.min.css';
+import 'filepond/dist/filepond.min.css';
 
-import FilePondPluginImageValidateSize from 'filepond-plugin-image-validate-size';
-import FilePondPluginFileValidateType from 'filepond-plugin-file-validate-type';
-import FilePondPluginImagePreview from 'filepond-plugin-image-preview';
-import FilePondPluginImageExifOrientation from 'filepond-plugin-image-exif-orientation';
+import { mapGetters, mapState } from 'vuex';
 import FilePondPluginFileValidateSize from 'filepond-plugin-file-validate-size';
+import FilePondPluginFileValidateType from 'filepond-plugin-file-validate-type';
+import FilePondPluginImageExifOrientation from 'filepond-plugin-image-exif-orientation';
+import FilePondPluginImagePreview from 'filepond-plugin-image-preview';
+import FilePondPluginImageValidateSize from 'filepond-plugin-image-validate-size';
 
 const FilePond = vueFilePond(
     FilePondPluginFileValidateType,
@@ -209,7 +211,6 @@ export default {
         return {
             isReadyToAcceptUploads: true,
             searchKeyword: '',
-            unsplashKey: window.Canvas.unsplash,
             unsplashPage: 1,
             unsplashPerPage: 12,
             unsplashImages: [],
@@ -221,22 +222,35 @@ export default {
             selectedImageLayout: 'default',
             selectedImageCaption: '',
             galleryModalClasses: ['modal-xl', 'modal-dialog-scrollable'],
-            maxUploadFilesize: window.Canvas.maxUpload,
-            path: window.Canvas.path,
-            trans: JSON.parse(window.Canvas.locale.translations),
         };
     },
 
-    mounted() {
-        this.$parent.$on('openingEmbedImageModal', (data) => {
-            if (!isEmpty(data)) {
-                this.selectedImageCaption = isEmpty(data.caption) ? '' : data.caption;
-                this.selectedImageUrl = data.url;
-                this.selectedImageLayout = data.layout || 'default';
-                this.selectedImageBlot = data.existingBlot;
-                this.isReadyToAcceptUploads = isEmpty(data.url);
-            }
-        });
+    computed: {
+        ...mapState(['settings', 'user']),
+        ...mapGetters({
+            trans: 'settings/trans',
+        }),
+
+        getServerOptions() {
+            return {
+                url: `${this.settings.path}/api/uploads`,
+                headers: {
+                    'X-CSRF-TOKEN': document.head.querySelector('meta[name="csrf-token"]').content,
+                },
+            };
+        },
+
+        getRetryIcon() {
+            return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="icon-refresh" width="26"><circle style="fill:none" cx="12" cy="12" r="10"/><path style="fill:white" d="M8.52 7.11a5.98 5.98 0 0 1 8.98 2.5 1 1 0 1 1-1.83.8 4 4 0 0 0-5.7-1.86l.74.74A1 1 0 0 1 10 11H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1.7-.7l.82.81zm5.51 8.34l-.74-.74A1 1 0 0 1 14 13h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1.7.7l-.82-.81A5.98 5.98 0 0 1 6.5 14.4a1 1 0 1 1 1.83-.8 4 4 0 0 0 5.7 1.85z"/></svg>';
+        },
+
+        getRemoveIcon() {
+            return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" class="icon-close-circle"><circle style="fill:none" cx="12" cy="12" r="10"/><path style="fill:white" d="M13.41 12l2.83 2.83a1 1 0 0 1-1.41 1.41L12 13.41l-2.83 2.83a1 1 0 1 1-1.41-1.41L10.59 12 7.76 9.17a1 1 0 0 1 1.41-1.41L12 10.59l2.83-2.83a1 1 0 0 1 1.41 1.41L13.41 12z"/></svg>';
+        },
+
+        getPlaceholderLabel() {
+            return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" class="icon-cloud-upload mr-3"><path class="fill-dark-gray" d="M18 14.97c0-.76-.3-1.51-.88-2.1l-3-3a3 3 0 0 0-4.24 0l-3 3A3 3 0 0 0 6 15a4 4 0 0 1-.99-7.88 5.5 5.5 0 0 1 10.86-.82A4.49 4.49 0 0 1 22 10.5a4.5 4.5 0 0 1-4 4.47z"/><path class="fill-dark-gray" d="M11 14.41V21a1 1 0 0 0 2 0v-6.59l1.3 1.3a1 1 0 0 0 1.4-1.42l-3-3a1 1 0 0 0-1.4 0l-3 3a1 1 0 0 0 1.4 1.42l1.3-1.3z"/></svg> Drop files or click here to upload';
+        },
     },
 
     watch: {
@@ -259,9 +273,21 @@ export default {
         }, 1000),
     },
 
+    mounted() {
+        this.$parent.$on('opening-embed-image-modal', (data) => {
+            if (!isEmpty(data)) {
+                this.selectedImageCaption = isEmpty(data.caption) ? '' : data.caption;
+                this.selectedImageUrl = data.url;
+                this.selectedImageLayout = data.layout || 'default';
+                this.selectedImageBlot = data.existingBlot;
+                this.isReadyToAcceptUploads = isEmpty(data.url);
+            }
+        });
+    },
+
     methods: {
         fetchUnsplashImages($state) {
-            const unsplash = new Unsplash({ accessKey: this.unsplashKey });
+            const unsplash = new Unsplash({ accessKey: this.settings.unsplash });
             unsplash.search
                 .photos(this.searchKeyword, this.unsplashPage, this.unsplashPerPage)
                 .then(toJson)
@@ -278,9 +304,9 @@ export default {
         },
 
         selectUnsplashImage(image) {
-            const unsplash = new Unsplash({ accessKey: this.unsplashKey });
+            const unsplash = new Unsplash({ accessKey: this.settings.unsplash });
 
-            // We must trigger a download to properly attribute traffic to the source
+            // Trigger a download to properly attribute traffic to the source
             // https://help.unsplash.com/en/articles/2511258-guideline-triggering-a-download
             unsplash.photos.downloadPhoto(image);
 
@@ -300,13 +326,13 @@ export default {
 
         buildImageCaption(image) {
             return (
-                this.trans.app.photo_by +
+                this.trans.photo_by +
                 ' <a href="' +
                 image.user.links.html +
                 '" target="_blank">' +
                 image.user.name +
                 '</a> ' +
-                this.trans.app.on +
+                this.trans.on +
                 ' <a href="https://unsplash.com" target="_blank">Unsplash</a>'
             );
         },
@@ -325,12 +351,12 @@ export default {
         clickDone() {
             if (!this.selectedImageUrl) {
                 if (!isEmpty(this.selectedImageBlot)) {
-                    this.$emit('removingEmbedImage', {
+                    this.$emit('removing-embed-image', {
                         existingBlot: this.selectedImageBlot,
                     });
                 }
             } else {
-                this.$emit('addingEmbedImage', {
+                this.$emit('adding-embed-image', {
                     url: this.selectedImageUrl,
                     caption: this.selectedImageCaption ?? '',
                     existingBlot: this.selectedImageBlot,
@@ -357,29 +383,6 @@ export default {
         closeModal() {
             this.clearAndResetComponent();
             this.$refs.modal.hide;
-        },
-    },
-
-    computed: {
-        getServerOptions() {
-            return {
-                url: '/' + window.Canvas.path + '/api/uploads',
-                headers: {
-                    'X-CSRF-TOKEN': this.getToken(),
-                },
-            };
-        },
-
-        getRetryIcon() {
-            return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="icon-refresh" width="26"><circle style="fill:none" cx="12" cy="12" r="10"/><path style="fill:white" d="M8.52 7.11a5.98 5.98 0 0 1 8.98 2.5 1 1 0 1 1-1.83.8 4 4 0 0 0-5.7-1.86l.74.74A1 1 0 0 1 10 11H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1.7-.7l.82.81zm5.51 8.34l-.74-.74A1 1 0 0 1 14 13h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1.7.7l-.82-.81A5.98 5.98 0 0 1 6.5 14.4a1 1 0 1 1 1.83-.8 4 4 0 0 0 5.7 1.85z"/></svg>';
-        },
-
-        getRemoveIcon() {
-            return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" class="icon-close-circle"><circle style="fill:none" cx="12" cy="12" r="10"/><path style="fill:white" d="M13.41 12l2.83 2.83a1 1 0 0 1-1.41 1.41L12 13.41l-2.83 2.83a1 1 0 1 1-1.41-1.41L10.59 12 7.76 9.17a1 1 0 0 1 1.41-1.41L12 10.59l2.83-2.83a1 1 0 0 1 1.41 1.41L13.41 12z"/></svg>';
-        },
-
-        getPlaceholderLabel() {
-            return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" class="icon-cloud-upload mr-3"><path class="fill-dark-gray" d="M18 14.97c0-.76-.3-1.51-.88-2.1l-3-3a3 3 0 0 0-4.24 0l-3 3A3 3 0 0 0 6 15a4 4 0 0 1-.99-7.88 5.5 5.5 0 0 1 10.86-.82A4.49 4.49 0 0 1 22 10.5a4.5 4.5 0 0 1-4 4.47z"/><path class="fill-dark-gray" d="M11 14.41V21a1 1 0 0 0 2 0v-6.59l1.3 1.3a1 1 0 0 0 1.4-1.42l-3-3a1 1 0 0 0-1.4 0l-3 3a1 1 0 0 0 1.4 1.42l1.3-1.3z"/></svg> Drop files or click here to upload';
         },
     },
 };

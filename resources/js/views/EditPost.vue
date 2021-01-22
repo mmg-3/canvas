@@ -1,23 +1,22 @@
 <template>
-    <div>
+    <section>
         <page-header>
-            <template slot="action">
-                <a
-                    v-if="isDraft(post.published_at)"
-                    href="#"
-                    class="btn btn-sm btn-outline-success font-weight-bold my-auto"
-                    @click="showPublishModal"
-                >
-                    <span class="d-block d-lg-none">{{ trans.app.publish }}</span>
-                    <span class="d-none d-lg-block">{{ trans.app.ready_to_publish }}</span>
-                </a>
-
-                <a v-else href="#" class="btn btn-sm btn-outline-success font-weight-bold my-auto" @click="save">
-                    {{ trans.app.save }}
-                </a>
+            <template slot="status">
+                <ul class="navbar-nav mr-auto flex-row float-right">
+                    <li class="text-muted font-weight-bold">
+                        <div class="border-left pl-3">
+                            <div v-if="!isSaving && !isSaved">
+                                <span v-if="isPublished(post.published_at)">{{ trans.published }}</span>
+                                <span v-if="isDraft(post.published_at)">{{ trans.draft }}</span>
+                            </div>
+                            <span v-if="isSaving">{{ trans.saving }}</span>
+                            <span v-if="isSaved" class="text-success">{{ trans.saved }}</span>
+                        </div>
+                    </li>
+                </ul>
             </template>
 
-            <template slot="menu">
+            <template slot="options">
                 <div class="dropdown">
                     <a
                         id="navbarDropdown"
@@ -44,89 +43,117 @@
 
                     <div class="dropdown-menu dropdown-menu-right">
                         <router-link
-                            v-if="!isDraft(post.published_at)"
-                            :to="{ name: 'stats-show', params: { id: id } }"
+                            v-if="isPublished(post.published_at)"
+                            :to="{ name: 'post-stats', params: { id: uri } }"
                             class="dropdown-item"
                         >
-                            {{ trans.app.view_stats }}
+                            {{ trans.view_stats }}
                         </router-link>
-                        <div v-if="!isDraft(post.published_at)" class="dropdown-divider"></div>
-                        <a href="#" class="dropdown-item" @click="showSettingsModal">
-                            {{ trans.app.general_settings }}
-                        </a>
-                        <a href="#" class="dropdown-item" @click="showFeaturedImageModal">
-                            {{ trans.app.featured_image }}
-                        </a>
-                        <a href="#" class="dropdown-item" @click="showSeoModal">
-                            {{ trans.app.seo_settings }}
-                        </a>
+                        <div v-if="isPublished(post.published_at)" class="dropdown-divider" />
                         <a
-                            v-if="!isDraft(post.published_at)"
+                            v-if="isDraft(post.published_at) && (isAdmin || isEditor)"
+                            href="#"
+                            class="dropdown-item"
+                            @click="showPublishModal"
+                        >
+                            {{ trans.publish }}
+                        </a>
+                        <a href="#" class="dropdown-item" @click="showSettingsModal"> {{ trans.general_settings }} </a>
+                        <a href="#" class="dropdown-item" @click="showFeaturedImageModal">
+                            {{ trans.featured_image }}
+                        </a>
+                        <a href="#" class="dropdown-item" @click="showSeoModal"> {{ trans.seo_settings }} </a>
+                        <a
+                            v-if="isPublished(post.published_at)"
                             href="#"
                             class="dropdown-item"
                             @click.prevent="convertToDraft"
                         >
-                            {{ trans.app.convert_to_draft }}
+                            {{ trans.convert_to_draft }}
                         </a>
-                        <a v-if="id !== 'create'" href="#" class="dropdown-item text-danger" @click="showDeleteModal">
-                            {{ trans.app.delete }}
+                        <a v-if="!creatingPost" href="#" class="dropdown-item text-danger" @click="showDeleteModal">
+                            {{ trans.delete }}
                         </a>
                     </div>
                 </div>
             </template>
         </page-header>
 
-        <main class="py-4" v-if="isReady">
+        <main v-if="isReady" class="py-4">
             <div class="col-xl-8 offset-xl-2 col-lg-10 offset-lg-1 col-md-12">
                 <div class="form-group my-3">
                     <textarea-autosize
-                        :placeholder="trans.app.title"
-                        class="form-control-lg form-control border-0 font-serif rounded shadow"
-                        @input.native="update"
-                        rows="1"
                         v-model="post.title"
+                        :placeholder="trans.title"
+                        style="font-size: 42px"
+                        class="w-100 form-control-lg border-0 font-serif bg-transparent px-0"
+                        rows="1"
+                        @input.native="updatePost"
                     />
                 </div>
 
-                <div class="form-group my-4">
-                    <div class="rounded shadow">
-                        <quill-editor></quill-editor>
-                    </div>
+                <div class="form-group my-2">
+                    <quill-editor :key="post.id" :post="post" @update-post="savePost" />
                 </div>
             </div>
         </main>
 
-        <publish-modal v-if="isReady" ref="publishModal" />
-
-        <settings-modal v-if="isReady" ref="settingsModal" :post="post" :tags="tags" :topics="topics" />
-
-        <featured-image-modal v-if="isReady" ref="featuredImageModal" />
-
-        <seo-modal v-if="isReady" ref="seoModal" />
-
-        <delete-modal
-            v-if="isReady"
-            ref="deleteModal"
-            @delete="deletePost"
-            :header="trans.app.delete"
-            :message="trans.app.deleted_posts_are_gone_forever"
-        />
-    </div>
+        <section v-if="isReady">
+            <publish-modal ref="publishModal" :post="post" @publish="updatePublishedAt" />
+            <settings-modal
+                ref="settingsModal"
+                :post="post"
+                :tags="tags"
+                :topics="topics"
+                :errors="errors"
+                @sync-slug="updateSlug"
+                @add-tag="addTag"
+                @add-post-tag="addPostTag"
+                @add-post-topic="addPostTopic"
+                @add-topic="addTopic"
+                @update-post="savePost"
+            />
+            <featured-image-modal
+                ref="featuredImageModal"
+                :post="post"
+                @update-featured-image="updateFeaturedImage"
+                @remove-featured-image="removeFeaturedImage"
+                @update-post="savePost"
+            />
+            <seo-modal
+                ref="seoModal"
+                :post="post"
+                @sync-title="updateMetaTitle"
+                @sync-description="updateMetaDescription"
+                @update-post="savePost"
+            />
+            <delete-modal
+                ref="deleteModal"
+                :header="trans.delete"
+                :message="trans.deleted_posts_are_gone_forever"
+                @delete="deletePost"
+            />
+        </section>
+    </section>
 </template>
 
 <script>
-import Vue from 'vue';
+import { mapGetters } from 'vuex';
 import $ from 'jquery';
-import debounce from 'lodash/debounce';
-import NProgress from 'nprogress';
-import SeoModal from '../components/modals/SeoModal';
-import PageHeader from '../components/PageHeader';
 import DeleteModal from '../components/modals/DeleteModal';
-import VueTextAreaAutosize from 'vue-textarea-autosize';
-import PublishModal from '../components/modals/PublishModal';
-import SettingsModal from '../components/modals/SettingsModal';
-import QuillEditor from '../components/editor/QuillEditor';
 import FeaturedImageModal from '../components/modals/FeaturedImageModal';
+import NProgress from 'nprogress';
+import PageHeader from '../components/PageHeader';
+import PublishModal from '../components/modals/PublishModal';
+import QuillEditor from '../components/editor/QuillEditor';
+import SeoModal from '../components/modals/SeoModal';
+import SettingsModal from '../components/modals/SettingsModal';
+import Vue from 'vue';
+import VueTextAreaAutosize from 'vue-textarea-autosize';
+import debounce from 'lodash/debounce';
+import get from 'lodash/get';
+import isEmpty from 'lodash/isEmpty';
+import status from '../mixins/status';
 
 Vue.use(VueTextAreaAutosize);
 
@@ -143,89 +170,197 @@ export default {
         SettingsModal,
     },
 
+    mixins: [status],
+
     data() {
         return {
-            post: {},
+            uri: this.$route.params.id || 'create',
+            post: {
+                id: null,
+                title: null,
+                slug: null,
+                summary: null,
+                body: null,
+                published_at: null,
+                featured_image: null,
+                featured_image_caption: null,
+                meta: {
+                    description: null,
+                    title: null,
+                    canonicalLink: null,
+                },
+                tags: [],
+                topic: [],
+            },
             tags: [],
             topics: [],
-            id: this.$route.params.id || 'create',
+            isSaving: false,
+            isSaved: false,
+            errors: [],
             isReady: false,
-            trans: JSON.parse(window.Canvas.locale.translations),
         };
     },
 
-    created() {
-        // todo: drop these in the header when the component loads and remove them after
-        // https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@9.18.1/build/highlight.min.js
-        // https://platform.twitter.com/widgets.js
-        // dark styles
-        // https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@10.1.1/build/styles/sunburst.min.css
-        // light styles
-        // https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@10.1.1/build/styles/github.min.css
+    computed: {
+        ...mapGetters({
+            trans: 'settings/trans',
+            isAdmin: 'settings/isAdmin',
+            isEditor: 'settings/isEditor',
+        }),
+
+        creatingPost() {
+            return this.$route.name === 'create-post';
+        },
     },
 
-    beforeRouteEnter(to, from, next) {
-        next((vm) => {
-            vm.request()
-                .get('/api/posts/' + vm.id)
-                .then((response) => {
-                    vm.$store.dispatch('setActivePost', response.data.post);
+    watch: {
+        async $route(to) {
+            if (this.uri === 'create' && to.params.id === this.id) {
+                this.uri = to.params.id;
+            }
 
-                    vm.post = vm.$store.getters.activePost;
-                    vm.tags = response.data.tags;
-                    vm.topics = response.data.topics;
-                    vm.isReady = true;
-
-                    NProgress.done();
-                })
-                .catch(() => {
-                    vm.$router.push({ name: 'posts' });
-                });
-        });
+            if (this.uri !== to.params.id) {
+                this.isReady = false;
+                this.uri = to.params.id;
+                await Promise.all([this.fetchPost()]);
+                this.isReady = true;
+                NProgress.done();
+            }
+        },
     },
 
-    beforeRouteLeave(to, from, next) {
-        // Reset the form status to avoid it flashing on the next screen load
-        this.post.isSaving = false;
-        this.post.hasSuccess = false;
-
-        next();
+    async created() {
+        await Promise.all([this.fetchPost()]);
+        this.isReady = true;
+        NProgress.done();
     },
 
     methods: {
-        save() {
-            this.post.errors = [];
-            this.post.isSaving = true;
-            this.post.hasSuccess = false;
+        fetchPost() {
+            return this.request()
+                .get(`/api/posts/${this.uri}`)
+                .then(({ data }) => {
+                    this.post.id = data.post.id;
+                    this.post.title = get(data.post, 'title', '');
+                    this.post.slug = get(data.post, 'slug', '');
+                    this.post.summary = get(data.post, 'summary', '');
+                    this.post.body = get(data.post, 'body', '');
+                    this.post.published_at = get(data.post, 'published_at', '');
+                    this.post.featured_image = get(data.post, 'featured_image', '');
+                    this.post.featured_image_caption = get(data.post, 'featured_image_caption', '');
+                    this.post.meta.description = get(data.post.meta, 'description', '');
+                    this.post.meta.title = get(data.post.meta, 'title', '');
+                    this.post.meta.canonical_link = get(data.post.meta, 'canonical_link', '');
+                    this.post.tags = get(data.post, 'tags', []);
+                    this.post.topic = get(data.post, 'topic', []);
 
-            if (this.id === 'create') {
-                this.id = this.post.id;
+                    this.tags = get(data, 'tags', []);
+                    this.topics = get(data, 'topics', []);
+
+                    NProgress.inc();
+                })
+                .catch(() => {
+                    this.$router.push({ name: 'posts' });
+                });
+        },
+
+        convertToDraft() {
+            this.post.published_at = null;
+            this.savePost();
+        },
+
+        updatePublishedAt(date) {
+            this.post.published_at = date;
+            this.savePost();
+        },
+
+        updateSlug(slug) {
+            this.post.slug = slug;
+        },
+
+        addTag(tag) {
+            this.tags.push(tag);
+        },
+
+        addTopic(topic) {
+            this.topics.push([topic]);
+        },
+
+        addPostTag(tag) {
+            this.post.tags.push(tag);
+            this.savePost();
+        },
+
+        addPostTopic(topic) {
+            this.post.topic = [topic];
+            this.savePost();
+        },
+
+        updateFeaturedImage(path) {
+            this.post.featured_image = path;
+        },
+
+        removeFeaturedImage() {
+            this.post.featured_image = null;
+            this.post.featured_image_caption = null;
+        },
+
+        updateMetaTitle(title) {
+            this.post.meta.title = title;
+        },
+
+        updateMetaDescription(description) {
+            this.post.meta.description = description;
+        },
+
+        updatePost: debounce(function () {
+            this.savePost();
+        }, 3000),
+
+        async savePost() {
+            this.errors = [];
+            this.isSaving = true;
+            this.isSaved = false;
+            this.post.title = this.post.title || 'Title';
+
+            await this.request()
+                .post(`/api/posts/${this.post.id}`, this.post)
+                .then(({ data }) => {
+                    this.isSaving = false;
+                    this.isSaved = true;
+                    this.post = data;
+
+                    // TODO: Check if searchable data is changing
+                    this.$store.dispatch('search/buildIndex', true);
+                })
+                .catch((error) => {
+                    this.errors = error.response.data.errors;
+                });
+
+            if (isEmpty(this.errors) && this.creatingPost) {
+                await this.$router.push({ name: 'edit-post', params: { id: this.post.id } });
+                NProgress.done();
             }
 
-            this.$store.dispatch('saveActivePost', {
-                data: this.post,
-                id: this.id,
-            });
-
             setTimeout(() => {
-                this.post.hasSuccess = false;
-                this.post.isSaving = false;
+                this.isSaved = false;
+                this.isSaving = false;
             }, 3000);
         },
 
-        update: debounce(function () {
-            this.save();
-        }, 3000),
-
-        convertToDraft() {
-            this.post.published_at = '';
-            this.save();
-        },
-
-        deletePost() {
-            this.$store.dispatch('deletePost', this.post.id);
+        async deletePost() {
+            await this.request()
+                .delete(`/api/posts/${this.post.id}`)
+                .then(() => {
+                    this.$store.dispatch('search/buildIndex', true);
+                    this.$toasted.show(this.trans.success, {
+                        className: 'bg-success',
+                    });
+                });
 
             $(this.$refs.deleteModal.$el).modal('hide');
+
+            await this.$router.push({ name: 'posts' });
         },
 
         showPublishModal() {
@@ -250,9 +385,3 @@ export default {
     },
 };
 </script>
-
-<style scoped>
-textarea {
-    font-size: 42px;
-}
-</style>

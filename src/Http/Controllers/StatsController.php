@@ -2,12 +2,17 @@
 
 namespace Canvas\Http\Controllers;
 
-use Canvas\Helpers\Traffic;
 use Canvas\Models\Post;
 use Canvas\Models\View;
 use Canvas\Models\Visit;
+use Carbon\CarbonInterval;
+use DateInterval;
+use DatePeriod;
+use DateTimeInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Collection;
 
 class StatsController extends Controller
 {
@@ -18,7 +23,12 @@ class StatsController extends Controller
      */
     public function index(): JsonResponse
     {
-        $posts = Post::forUser(request()->user())
+        $posts = Post::query()
+                     ->when(request()->query('scope', 'user') === 'all', function (Builder $query) {
+                         return $query;
+                     }, function (Builder $query) {
+                         return $query->where('user_id', request()->user('canvas')->id);
+                     })
                      ->published()
                      ->latest()
                      ->get();
@@ -38,12 +48,11 @@ class StatsController extends Controller
                        ])->get();
 
         return response()->json([
-            'posts' => $posts,
-            'total_views' => $views->count(),
-            'total_visits' => $visits->count(),
+            'totalViews' => $views->count(),
+            'totalVisits' => $visits->count(),
             'traffic' => [
-                'views' => json_encode(Traffic::calculateTotalForDays($views, 30)),
-                'visits' => json_encode(Traffic::calculateTotalForDays($visits, 30)),
+                'views' => self::calculateTotalForDays($views, 30)->toJson(),
+                'visits' => self::calculateTotalForDays($visits, 30)->toJson(),
             ],
         ]);
     }
@@ -56,50 +65,142 @@ class StatsController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $post = Post::forUser(request()->user())->find($id);
+        $post = Post::query()
+                    ->when(request()->user('canvas')->isContributor, function (Builder $query) {
+                        return $query->where('user_id', request()->user('canvas')->id);
+                    }, function (Builder $query) {
+                        return $query;
+                    })
+                    ->find($id);
 
         if (! $post || ! $post->published) {
             return response()->json(null, 404);
         }
 
-        $views = View::where('post_id', $post->id)->get();
-        $previousMonthlyViews = $views->whereBetween('created_at', [
+        $previousMonthlyViews = $post->views->whereBetween('created_at', [
             today()->subMonth()->startOfMonth()->startOfDay()->toDateTimeString(),
             today()->subMonth()->endOfMonth()->endOfDay()->toDateTimeString(),
         ]);
-        $currentMonthlyViews = $views->whereBetween('created_at', [
+
+        $currentMonthlyViews = $post->views->whereBetween('created_at', [
             today()->startOfMonth()->startOfDay()->toDateTimeString(),
             today()->endOfMonth()->endOfDay()->toDateTimeString(),
         ]);
-        $lastThirtyDays = $views->whereBetween('created_at', [
+
+        $lastThirtyDays = $post->views->whereBetween('created_at', [
             today()->subDays(30)->startOfDay()->toDateTimeString(),
             today()->endOfDay()->toDateTimeString(),
         ]);
 
-        $visits = Visit::where('post_id', $post->id)->get();
-        $previousMonthlyVisits = $visits->whereBetween('created_at', [
+        $previousMonthlyVisits = $post->visits->whereBetween('created_at', [
             today()->subMonth()->startOfMonth()->startOfDay()->toDateTimeString(),
             today()->subMonth()->endOfMonth()->endOfDay()->toDateTimeString(),
         ]);
-        $currentMonthlyVisits = $visits->whereBetween('created_at', [
+
+        $currentMonthlyVisits = $post->visits->whereBetween('created_at', [
             today()->startOfMonth()->startOfDay()->toDateTimeString(),
             today()->endOfMonth()->endOfDay()->toDateTimeString(),
         ]);
 
         return response()->json([
             'post' => $post,
-            'read_time' => $post->read_time,
-            'popular_reading_times' => $post->popular_reading_times,
-            'top_referers' => $post->top_referers,
-            'monthly_views' => $currentMonthlyViews->count(),
-            'total_views' => $views->count(),
-            'monthly_visits' => $currentMonthlyVisits->count(),
-            'month_over_month_views' => Traffic::compareMonthOverMonth($currentMonthlyViews, $previousMonthlyViews),
-            'month_over_month_visits' => Traffic::compareMonthOverMonth($currentMonthlyVisits, $previousMonthlyVisits),
+            'readTime' => $post->read_time,
+            'popularReadingTimes' => $post->popular_reading_times,
+            'topReferers' => $post->top_referers,
+            'monthlyViews' => $currentMonthlyViews->count(),
+            'totalViews' => $post->views->count(),
+            'monthlyVisits' => $currentMonthlyVisits->count(),
+            'monthOverMonthViews' => $this->compareMonthOverMonth($currentMonthlyViews, $previousMonthlyViews),
+            'monthOverMonthVisits' => $this->compareMonthOverMonth($currentMonthlyVisits, $previousMonthlyVisits),
             'traffic' => [
-                'views' => json_encode(Traffic::calculateTotalForDays($lastThirtyDays, 30)),
-                'visits' => json_encode(Traffic::calculateTotalForDays($visits, 30)),
+                'views' => $this->calculateTotalForDays($lastThirtyDays, 30)->toJson(),
+                'visits' => $this->calculateTotalForDays($post->visits, 30)->toJson(),
             ],
         ]);
+    }
+
+    /**
+     * Given a collection of Views or Visits, return an array of formatted
+     * date strings and their related counts for a given number of days.
+     *
+     * example: [ Y-m-d => total ]
+     *
+     * @param Collection $data
+     * @param int $days
+     * @return Collection
+     */
+    protected function calculateTotalForDays(Collection $data, int $days = 30): Collection
+    {
+        // Filter the data to only include created_at date strings
+        $filtered = collect();
+        $data->sortBy('created_at')->each(function ($item) use ($filtered) {
+            $filtered->push($item->created_at->toDateString());
+        });
+
+        // Count the unique values and assign to their respective keys
+        $unique = array_count_values($filtered->toArray());
+
+        // Create a day range to hold the default date values
+        $period = $this->generateRange(today()->subDays($days), CarbonInterval::day(), $days);
+
+        // Compare the data and date range arrays, assigning counts where applicable
+        $total = collect();
+
+        foreach ($period as $date) {
+            if (array_key_exists($date, $unique)) {
+                $total->put($date, $unique[$date]);
+            } else {
+                $total->put($date, 0);
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * Given two collections of monthly data, compare the totals and return the
+     * overall directional trend as well as the percentage increase/decrease.
+     *
+     * @param Collection $current
+     * @param Collection $previous
+     * @return array
+     */
+    protected function compareMonthOverMonth(Collection $current, Collection $previous): array
+    {
+        $dataCountThisMonth = $current->count();
+        $dataCountLastMonth = $previous->count();
+
+        if ($dataCountLastMonth != 0) {
+            $difference = (int) $dataCountThisMonth - (int) $dataCountLastMonth;
+            $growth = ($difference / $dataCountLastMonth) * 100;
+        } else {
+            $growth = $dataCountThisMonth * 100;
+        }
+
+        return [
+            'direction' => $dataCountThisMonth > $dataCountLastMonth ? 'up' : 'down',
+            'percentage' => number_format(abs($growth)),
+        ];
+    }
+
+    /**
+     * Generate a date range array of formatted strings.
+     *
+     * @param DateTimeInterface $start_date
+     * @param DateInterval $interval
+     * @param int $recurrences
+     * @param int $exclusive
+     * @return array
+     */
+    protected function generateRange(DateTimeInterface $start_date, DateInterval $interval, int $recurrences, int $exclusive = 1): array
+    {
+        $period = new DatePeriod($start_date, $interval, $recurrences, $exclusive);
+        $dates = collect();
+
+        foreach ($period as $date) {
+            $dates->push($date->format('Y-m-d'));
+        }
+
+        return $dates->toArray();
     }
 }

@@ -1,16 +1,16 @@
 <template>
     <div class="modal fade" tabindex="-1" role="dialog" aria-hidden="true" data-backdrop="static">
-        <div class="modal-dialog" ref="modal" role="document">
+        <div ref="modal" class="modal-dialog" role="document">
             <div class="modal-content">
-                <div class="modal-header d-flex align-items-center justify-content-between border-0">
-                    <h4 class="modal-title">{{ trans.app.embed_content }}</h4>
+                <div class="modal-header d-flex align-items-center justify-content-between">
+                    <h5 class="modal-title">{{ trans.embed_content }}</h5>
 
                     <button
                         type="button"
-                        @click.prevent="closeModal"
                         class="close"
                         data-dismiss="modal"
                         aria-label="Close"
+                        @click.prevent="closeModal"
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -30,25 +30,24 @@
                     <div class="form-group row">
                         <div class="col-12">
                             <textarea
-                                rows="6"
-                                id="embed"
-                                name="embed"
-                                style="resize: none;"
-                                class="form-control border-0"
                                 v-model="content"
-                                :placeholder="trans.app.paste_embed_code_to_include"
-                            >
-                            </textarea>
+                                id="embed"
+                                rows="6"
+                                name="embed"
+                                style="resize: none"
+                                class="form-control border-0"
+                                :placeholder="trans.paste_embed_code_to_include"
+                            />
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button
                         class="btn btn-link btn-block text-muted font-weight-bold text-decoration-none"
-                        @click="clickDone"
                         data-dismiss="modal"
+                        @click="clickDone"
                     >
-                        {{ trans.app.done }}
+                        {{ trans.done }}
                     </button>
                 </div>
             </div>
@@ -57,6 +56,7 @@
 </template>
 
 <script>
+import { mapGetters } from 'vuex';
 import isEmpty from 'lodash/isEmpty';
 
 export default {
@@ -66,12 +66,17 @@ export default {
         return {
             blot: null,
             content: null,
-            trans: JSON.parse(window.Canvas.locale.translations),
         };
     },
 
+    computed: {
+        ...mapGetters({
+            trans: 'settings/trans',
+        }),
+    },
+
     mounted() {
-        this.$parent.$on('openingEmbedContentModal', (data) => {
+        this.$parent.$on('opening-embed-content-modal', (data) => {
             if (!isEmpty(data)) {
                 this.blot = data.existingBlot;
                 this.content = data.content;
@@ -82,7 +87,7 @@ export default {
     methods: {
         clickDone() {
             if (!isEmpty(this.content)) {
-                this.$emit('addingEmbedContent', {
+                this.$emit('adding-embed-content', {
                     content: this.content,
                     existingBlot: this.blot,
                 });

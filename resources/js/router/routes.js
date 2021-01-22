@@ -1,21 +1,17 @@
-import Vue from 'vue';
-import Router from 'vue-router';
 import AllStats from '../views/AllStats';
-import PostStats from '../views/PostStats';
-import PostList from '../views/PostList';
 import EditPost from '../views/EditPost';
-import EditTag from '../views/EditTag';
-import TagList from '../views/TagList';
-import EditTopic from '../views/EditTopic';
-import TopicList from '../views/TopicList';
 import EditSettings from '../views/EditSettings';
+import EditTag from '../views/EditTag';
+import EditTopic from '../views/EditTopic';
 import EditUser from '../views/EditUser';
+import PostList from '../views/PostList';
+import PostStats from '../views/PostStats';
+import TagList from '../views/TagList';
+import TopicList from '../views/TopicList';
 import UserList from '../views/UserList';
-import store from '../store';
+import settings from '../store/modules/settings';
 
-Vue.use(Router);
-
-let auth = store.state.auth;
+let isAdmin = settings.state.user.role === 3;
 
 export default [
     {
@@ -53,11 +49,7 @@ export default [
         name: 'tags',
         component: TagList,
         beforeEnter: (to, from, next) => {
-            if (auth.admin === 1) {
-                next();
-            } else {
-                next({ name: 'home' });
-            }
+            isAdmin ? next() : next({ name: 'home' });
         },
     },
     {
@@ -65,11 +57,7 @@ export default [
         name: 'create-tag',
         component: EditTag,
         beforeEnter: (to, from, next) => {
-            if (auth.admin === 1) {
-                next();
-            } else {
-                next({ name: 'home' });
-            }
+            isAdmin ? next() : next({ name: 'home' });
         },
     },
     {
@@ -77,11 +65,7 @@ export default [
         name: 'edit-tag',
         component: EditTag,
         beforeEnter: (to, from, next) => {
-            if (auth.admin === 1) {
-                next();
-            } else {
-                next({ name: 'home' });
-            }
+            isAdmin ? next() : next({ name: 'home' });
         },
     },
     {
@@ -89,11 +73,7 @@ export default [
         name: 'topics',
         component: TopicList,
         beforeEnter: (to, from, next) => {
-            if (auth.admin === 1) {
-                next();
-            } else {
-                next({ name: 'home' });
-            }
+            isAdmin ? next() : next({ name: 'home' });
         },
     },
     {
@@ -101,11 +81,7 @@ export default [
         name: 'create-topic',
         component: EditTopic,
         beforeEnter: (to, from, next) => {
-            if (auth.admin === 1) {
-                next();
-            } else {
-                next({ name: 'home' });
-            }
+            isAdmin ? next() : next({ name: 'home' });
         },
     },
     {
@@ -113,11 +89,7 @@ export default [
         name: 'edit-topic',
         component: EditTopic,
         beforeEnter: (to, from, next) => {
-            if (auth.admin === 1) {
-                next();
-            } else {
-                next({ name: 'home' });
-            }
+            isAdmin ? next() : next({ name: 'home' });
         },
     },
     {
@@ -130,11 +102,15 @@ export default [
         name: 'users',
         component: UserList,
         beforeEnter: (to, from, next) => {
-            if (auth.admin === 1) {
-                next();
-            } else {
-                next({ name: 'home' });
-            }
+            isAdmin ? next() : next({ name: 'home' });
+        },
+    },
+    {
+        path: '/users/create',
+        name: 'create-user',
+        component: EditUser,
+        beforeEnter: (to, from, next) => {
+            isAdmin ? next() : next({ name: 'home' });
         },
     },
     {
@@ -142,7 +118,7 @@ export default [
         name: 'edit-user',
         component: EditUser,
         beforeEnter: (to, from, next) => {
-            if (auth.admin === 1 || auth.id === to.params.id) {
+            if (isAdmin || settings.state.user.id == to.params.id) {
                 next();
             } else {
                 next({ name: 'home' });

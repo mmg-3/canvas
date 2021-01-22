@@ -1,13 +1,13 @@
 <template>
-    <div style="height: 300px;">
+    <div style="height: 300px">
         <canvas id="stats" />
     </div>
 </template>
 
 <script>
-import moment from 'moment';
+import { mapGetters } from 'vuex';
 import Chart from 'chart.js';
-import i18n from '../mixins/i18n';
+import moment from 'moment';
 
 export default {
     name: 'line-chart',
@@ -24,32 +24,37 @@ export default {
         },
     },
 
-    mixins: [i18n],
+    computed: {
+        ...mapGetters({
+            trans: 'settings/trans',
+        }),
 
-    mounted() {
-        let ref = this;
-        this.createChart('stats', {
-            type: 'line',
-            data: {
+        chartData() {
+            return {
                 labels: Object.keys(this.views),
                 datasets: [
                     {
-                        label: this.i18n.visits,
+                        label: this.trans.visits,
                         data: Object.values(this.visits),
                         backgroundColor: ['rgba(158, 213, 237, 0.5)'],
                         borderColor: ['rgb(84, 175, 204)'],
                         borderWidth: 3,
                     },
                     {
-                        label: this.i18n.views,
+                        label: this.trans.views,
                         data: Object.values(this.views),
                         backgroundColor: ['rgba(3, 168, 124, .5)'],
                         borderColor: ['#03a87c'],
                         borderWidth: 3,
                     },
                 ],
-            },
-            options: {
+            };
+        },
+
+        chartOptions() {
+            let ref = this;
+
+            return {
                 legend: {
                     display: false,
                 },
@@ -131,32 +136,36 @@ export default {
                         },
                     ],
                 },
-            },
-        });
+            };
+        },
+    },
+
+    mounted() {
+        this.createChart();
     },
 
     methods: {
-        createChart(chartId, chartData) {
-            new Chart(document.getElementById(chartId), {
-                type: chartData.type,
-                data: chartData.data,
-                options: chartData.options,
+        createChart() {
+            new Chart(document.getElementById('stats'), {
+                type: 'line',
+                data: this.chartData,
+                options: this.chartOptions,
             });
         },
 
         viewLabel(value) {
             if (Number(value) === 1) {
-                return value + ' ' + this.i18n.view;
+                return `${value} ${this.trans.view.toLowerCase()}`;
             } else {
-                return value + ' ' + this.i18n.views_simple;
+                return `${value} ${this.trans.views.toLowerCase()}`;
             }
         },
 
         uniqueVisitorLabel(value) {
             if (Number(value) === 1) {
-                return value + ' ' + this.i18n.unique_visit;
+                return `${value} ${this.trans.unique_visit}`;
             } else {
-                return value + ' ' + this.i18n.unique_visits;
+                return `${value} ${this.trans.unique_visits}`;
             }
         },
     },

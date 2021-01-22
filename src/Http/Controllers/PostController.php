@@ -2,13 +2,14 @@
 
 namespace Canvas\Http\Controllers;
 
+use Canvas\Http\Requests\PostRequest;
 use Canvas\Models\Post;
 use Canvas\Models\Tag;
 use Canvas\Models\Topic;
 use Exception;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Illuminate\Validation\Rule;
 use Ramsey\Uuid\Uuid;
 
 class PostController extends Controller
@@ -20,16 +21,43 @@ class PostController extends Controller
      */
     public function index(): JsonResponse
     {
-        if (request()->query('type') === 'draft') {
-            $postBuilder = Post::forUser(request()->user())->draft();
-        } else {
-            $postBuilder = Post::forUser(request()->user())->published();
-        }
+        $posts = Post::query()
+                     ->when(request()->user('canvas')->isContributor || request()->query('scope', 'user') != 'all', function (Builder $query) {
+                         return $query->where('user_id', request()->user('canvas')->id);
+                     }, function (Builder $query) {
+                         return $query;
+                     })
+                     ->when(request()->query('type', 'published') != 'draft', function (Builder $query) {
+                         return $query->published();
+                     }, function (Builder $query) {
+                         return $query->draft();
+                     })
+                     ->latest()
+                     ->withCount('views')
+                     ->paginate();
+
+        $draftCount = Post::query()
+                          ->when(request()->user('canvas')->isContributor || request()->query('scope', 'user') != 'all', function (Builder $query) {
+                              return $query->where('user_id', request()->user('canvas')->id);
+                          }, function (Builder $query) {
+                              return $query;
+                          })
+                          ->draft()
+                          ->count();
+
+        $publishedCount = Post::query()
+                              ->when(request()->user('canvas')->isContributor || request()->query('scope', 'user') != 'all', function (Builder $query) {
+                                  return $query->where('user_id', request()->user('canvas')->id);
+                              }, function (Builder $query) {
+                                  return $query;
+                              })
+                              ->published()
+                              ->count();
 
         return response()->json([
-            'posts' => $postBuilder->latest()->withCount('views')->paginate(),
-            'draftCount' => Post::forUser(request()->user())->draft()->count(),
-            'publishedCount' => Post::forUser(request()->user())->published()->count(),
+            'posts' => $posts,
+            'draftCount' => $draftCount,
+            'publishedCount' => $publishedCount,
         ], 200);
     }
 
@@ -55,55 +83,70 @@ class PostController extends Controller
     /**
      * Store a newly created resource in storage.
      *
+     * @param PostRequest $request
      * @param $id
      * @return JsonResponse
      * @throws Exception
      */
-    public function store($id): JsonResponse
+    public function store(PostRequest $request, $id): JsonResponse
     {
-        $post = Post::forUser(request()->user())->find($id) ?? new Post(['id' => $id]);
+        $data = $request->validated();
 
-        $data = [
-            'id' => $id,
-            'slug' => request('slug', $post->slug),
-            'title' => request('title', trans('canvas::app.title', [], optional($post->userMeta)->locale)),
-            'summary' => request('summary', $post->summary),
-            'body' => request('body', $post->body),
-            'published_at' => request('published_at', $post->published_at),
-            'featured_image' => request('featured_image', $post->featured_image),
-            'featured_image_caption' => request('featured_image_caption', $post->featured_image_caption),
-            'meta' => [
-                'title' => request('meta.title', optional($post->meta)['title']),
-                'description' => request('meta.description', optional($post->meta)['description']),
-                'canonical_link' => request('meta.canonical_link', optional($post->meta)['canonical_link']),
-            ],
-            'user_id' => request()->user()->id,
-        ];
+        $post = Post::query()
+                    ->when($request->user('canvas')->isContributor, function (Builder $query) {
+                        return $query->where('user_id', request()->user('canvas')->id);
+                    }, function (Builder $query) {
+                        return $query;
+                    })
+                    ->with('tags', 'topic')
+                    ->find($id);
 
-        $rules = [
-            'slug' => [
-                'required',
-                'alpha_dash',
-                Rule::unique('canvas_posts')->where(function ($query) {
-                    return $query->where('slug', request('slug'))->where('user_id', request()->user()->id);
-                })->ignore($id)->whereNull('deleted_at'),
-            ],
-        ];
-
-        $messages = [
-            'required' => trans('canvas::app.validation_required', [], optional($post->userMeta)->locale),
-            'unique' => trans('canvas::app.validation_unique', [], optional($post->userMeta)->locale),
-        ];
-
-        validator($data, $rules, $messages)->validate();
+        if (! $post) {
+            $post = new Post(['id' => $id]);
+        }
 
         $post->fill($data);
 
+        $post->user_id = $post->user_id ?? request()->user('canvas')->id;
+
         $post->save();
 
-        $post->topic()->sync($this->syncTopic(request('topic', [])));
+        $tags = Tag::query()->get(['id', 'name', 'slug']);
+        $topics = Topic::query()->get(['id', 'name', 'slug']);
 
-        $post->tags()->sync($this->syncTags(request('tags', [])));
+        $tagsToSync = collect($request->input('tags', []))->map(function ($item) use ($tags) {
+            $tag = $tags->firstWhere('slug', $item['slug']);
+
+            if (! $tag) {
+                $tag = Tag::create([
+                    'id' => $id = Uuid::uuid4()->toString(),
+                    'name' => $item['name'],
+                    'slug' => $item['slug'],
+                    'user_id' => request()->user('canvas')->id,
+                ]);
+            }
+
+            return (string) $tag->id;
+        })->toArray();
+
+        $topicToSync = collect($request->input('topic', []))->map(function ($item) use ($topics) {
+            $topic = $topics->firstWhere('slug', $item['slug']);
+
+            if (! $topic) {
+                $topic = Topic::create([
+                    'id' => $id = Uuid::uuid4()->toString(),
+                    'name' => $item['name'],
+                    'slug' => $item['slug'],
+                    'user_id' => request()->user('canvas')->id,
+                ]);
+            }
+
+            return (string) $topic->id;
+        })->toArray();
+
+        $post->tags()->sync($tagsToSync);
+
+        $post->topic()->sync($topicToSync);
 
         return response()->json($post->refresh(), 201);
     }
@@ -113,15 +156,23 @@ class PostController extends Controller
      *
      * @param $id
      * @return JsonResponse
-     * @throws Exception
      */
     public function show($id): JsonResponse
     {
-        if (Post::forUser(request()->user())->pluck('id')->contains($id)) {
+        $post = Post::query()
+                    ->when(request()->user('canvas')->isContributor, function (Builder $query) {
+                        return $query->where('user_id', request()->user('canvas')->id);
+                    }, function (Builder $query) {
+                        return $query;
+                    })
+                    ->with('tags:name,slug', 'topic:name,slug')
+                    ->find($id);
+
+        if ($post) {
             return response()->json([
-                'post' => Post::forUser(request()->user())->with('tags:name,slug', 'topic:name,slug')->find($id),
-                'tags' => Tag::get(['name', 'slug']),
-                'topics' => Topic::get(['name', 'slug']),
+                'post' => $post,
+                'tags' => Tag::query()->get(['name', 'slug']),
+                'topics' => Topic::query()->get(['name', 'slug']),
             ]);
         } else {
             return response()->json(null, 404);
@@ -133,70 +184,20 @@ class PostController extends Controller
      *
      * @param $id
      * @return mixed
+     * @throws Exception
      */
     public function destroy($id)
     {
-        $post = Post::forUser(request()->user())->findOrFail($id);
+        $post = Post::query()
+                    ->when(request()->user('canvas')->isContributor, function (Builder $query) {
+                        return $query->where('user_id', request()->user('canvas')->id);
+                    }, function (Builder $query) {
+                        return $query;
+                    })
+                    ->findOrFail($id);
 
         $post->delete();
 
         return response()->json(null, 204);
-    }
-
-    /**
-     * Sync the topic assigned to the post.
-     *
-     * @param $incomingTopic
-     * @return array
-     * @throws Exception
-     */
-    private function syncTopic($incomingTopic): array
-    {
-        if (collect($incomingTopic)->isEmpty()) {
-            return [];
-        }
-
-        $topic = Topic::firstWhere('slug', $incomingTopic['slug']);
-
-        if (! $topic) {
-            $topic = Topic::create([
-                'id' => $id = Uuid::uuid4()->toString(),
-                'name' => $incomingTopic['name'],
-                'slug' => $incomingTopic['slug'],
-                'user_id' => request()->user()->id,
-            ]);
-        }
-
-        return collect((string) $topic->id)->toArray();
-    }
-
-    /**
-     * Sync the tags assigned to the post.
-     *
-     * @param $incomingTags
-     * @return array
-     */
-    private function syncTags($incomingTags): array
-    {
-        if (collect($incomingTags)->isEmpty()) {
-            return [];
-        }
-
-        $tags = Tag::get(['id', 'name', 'slug']);
-
-        return collect($incomingTags)->map(function ($incomingTag) use ($tags) {
-            $tag = $tags->firstWhere('slug', $incomingTag['slug']);
-
-            if (! $tag) {
-                $tag = Tag::create([
-                    'id' => $id = Uuid::uuid4()->toString(),
-                    'name' => $incomingTag['name'],
-                    'slug' => $incomingTag['slug'],
-                    'user_id' => request()->user()->id,
-                ]);
-            }
-
-            return (string) $tag->id;
-        })->toArray();
     }
 }

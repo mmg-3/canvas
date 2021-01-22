@@ -6,67 +6,60 @@ use Canvas\Http\Middleware\Session;
 use Canvas\Models\Post;
 use Canvas\Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 
+/**
+ * Class SessionTest.
+ *
+ * @covers \Canvas\Http\Middleware\Session
+ */
 class SessionTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * The middleware instance.
-     *
-     * @var Session
-     */
-    protected $instance;
-
-    /**
-     * @return void
-     */
-    protected function setUp(): void
+    public function setUp(): void
     {
         parent::setUp();
 
-        $this->instance = new Session();
+        Route::middleware([Session::class])->any('/_test/session', function () {
+            return true;
+        });
     }
 
-    /** @test */
-    public function it_can_prune_expired_views()
+    public function testOldVisitsArePrunedFromSession(): void
     {
-        $recent = factory(Post::class)->create();
+        $recentPost = factory(Post::class)->create();
+        $oldPost = factory(Post::class)->create();
 
-        session()->put('viewed_posts.'.$recent->id, now()->timestamp);
-
-        $old = factory(Post::class)->create();
-
-        session()->put('viewed_posts.'.$old->id, now()->subHour()->subMinute()->timestamp);
-
-        $this->invokeMethod($this->instance, 'pruneExpiredViews', [collect(session()->get('viewed_posts'))]);
-
-        $this->assertArrayHasKey($recent->id, session()->get('viewed_posts'));
-        $this->assertArrayNotHasKey($old->id, session()->get('viewed_posts'));
-    }
-
-    /** @test */
-    public function it_can_prune_expired_visits()
-    {
-        $ip = '127.0.0.1';
-
-        $recent = factory(Post::class)->create();
-
-        session()->put('visited_posts.'.$recent->id, [
+        session()->put('visited_posts.'.$recentPost->id, [
             'timestamp' => now()->timestamp,
-            'ip' => $ip,
+            'ip' => '127.0.0.1',
         ]);
 
-        $old = factory(Post::class)->create();
-
-        session()->put('visited_posts.'.$old->id, [
+        session()->put('visited_posts.'.$oldPost->id, [
             'timestamp' => now()->subDay()->timestamp,
-            'ip' => $ip,
+            'ip' => '127.0.0.1',
         ]);
 
-        $this->invokeMethod($this->instance, 'pruneExpiredVisits', [collect(session()->get('visited_posts'))]);
+        $this->get('/_test/session')->assertSessionHas([
+            "visited_posts.{$recentPost->id}",
+        ])->assertSessionMissing([
+            "visited_posts.{$oldPost->id}",
+        ]);
+    }
 
-        $this->assertArrayHasKey($recent->id, session()->get('visited_posts'));
-        $this->assertArrayNotHasKey($old->id, session()->get('visited_posts'));
+    public function testOldViewsArePrunedFromSession(): void
+    {
+        $recentPost = factory(Post::class)->create();
+        $oldPost = factory(Post::class)->create();
+
+        session()->put('viewed_posts.'.$recentPost->id, now()->timestamp);
+        session()->put('viewed_posts.'.$oldPost->id, now()->subHours(2)->timestamp);
+
+        $this->get('/_test/session')->assertSessionHas([
+            "viewed_posts.{$recentPost->id}",
+        ])->assertSessionMissing([
+            "viewed_posts.{$oldPost->id}",
+        ]);
     }
 }

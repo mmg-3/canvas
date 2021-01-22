@@ -3,6 +3,8 @@
 namespace Canvas\Http\Controllers;
 
 use Canvas\Models\Post;
+use Illuminate\Contracts\Routing\ResponseFactory;
+use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 
 class FeedController extends Controller
@@ -10,14 +12,14 @@ class FeedController extends Controller
     /**
      * Return the RSS feed.
      *
-     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\Response
+     * @return ResponseFactory|Response
      */
     public function __invoke()
     {
         $data = [
             'name' => config('app.name'),
             'link' => url(config('canvas.feed.path')),
-            'data' => Post::published()->with('user')->get()->toArray(),
+            'posts' => Post::published()->with('user')->get()->toArray(),
             'updated' => now()->toDateTimeString(),
         ];
 

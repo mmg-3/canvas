@@ -2,11 +2,15 @@
 
 namespace Canvas\Http\Controllers;
 
-use Canvas\Models\UserMeta;
-use Illuminate\Foundation\Auth\User;
+use Canvas\Canvas;
+use Canvas\Http\Requests\UserRequest;
+use Canvas\Models\User;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Hash;
+use Ramsey\Uuid\Uuid;
 
 class UserController extends Controller
 {
@@ -17,7 +21,71 @@ class UserController extends Controller
      */
     public function index(): JsonResponse
     {
-        return response()->json(resolve(config('canvas.user', User::class))->latest()->paginate(), 200);
+        return response()->json(
+            User::query()
+                ->latest()
+                ->withCount('posts')
+                ->paginate(), 200
+        );
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return JsonResponse
+     */
+    public function create(): JsonResponse
+    {
+        return response()->json(User::make([
+            'id' => Uuid::uuid4()->toString(),
+            'role' => User::CONTRIBUTOR,
+        ]), 200);
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param UserRequest $request
+     * @param $id
+     * @return JsonResponse
+     */
+    public function store(UserRequest $request, $id): JsonResponse
+    {
+        $data = $request->validated();
+
+        $user = User::query()->find($id);
+
+        if (! $user) {
+            if ($user = User::onlyTrashed()->firstWhere('email', $data['email'])) {
+                $user->restore();
+
+                return response()->json([
+                    'user' => $user->refresh(),
+                    'i18n' => collect(trans('canvas::app', [], $user->locale))->toJson(),
+                ], 201);
+            } else {
+                $user = new User([
+                    'id' => $id,
+                ]);
+            }
+        }
+
+        if (! Arr::has($data, 'locale') || ! Arr::has(Canvas::availableLanguageCodes(), $data['locale'])) {
+            $data['locale'] = config('app.fallback_locale');
+        }
+
+        $user->fill($data);
+
+        if (Arr::has($data, 'password')) {
+            $user->password = Hash::make($data['password']);
+        }
+
+        $user->save();
+
+        return response()->json([
+            'user' => $user->refresh(),
+            'i18n' => collect(trans('canvas::app', [], $user->locale))->toJson(),
+        ], 201);
     }
 
     /**
@@ -28,55 +96,42 @@ class UserController extends Controller
      */
     public function show($id): JsonResponse
     {
-        return response()->json([
-            'user' => resolve(config('canvas.user', User::class))->find($id),
-            'meta' => UserMeta::firstWhere('user_id', $id),
-        ]);
+        $user = User::query()->withCount('posts')->find($id);
+
+        return $user ? response()->json($user, 200) : response()->json(null, 404);
     }
 
     /**
-     * Update the specified resource in storage.
+     * Display the specified relationship.
      *
      * @param $id
      * @return JsonResponse
      */
-    public function update($id): JsonResponse
+    public function showPosts($id): JsonResponse
     {
-        $meta = UserMeta::firstWhere('user_id', $id) ?? new UserMeta();
+        $user = User::query()->with('posts')->find($id);
 
-        $data = [
-            'avatar' => request('avatar', $meta->avatar),
-            'dark_mode' => request('darkMode', $meta->dark_mode),
-            'digest' => request('digest', $meta->digest),
-            'locale' => request('locale', $meta->locale),
-            'user_id' => request()->user()->id,
-            'username' => request('username', $meta->username),
-            'summary' => request('summary', $meta->summary),
-        ];
+        return $user ? response()->json($user->posts()->withCount('views')->paginate(), 200) : response()->json(null, 200);
+    }
 
-        $rules = [
-            'user_id' => 'required',
-            'username' => [
-                'nullable',
-                'alpha_dash',
-                Rule::unique('canvas_user_meta')->ignore(request()->user()->id, 'user_id'),
-            ],
-        ];
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param $id
+     * @return mixed
+     * @throws Exception
+     */
+    public function destroy($id)
+    {
+        // Prevent a user from deleting their own account
+        if (request()->user('canvas')->id == $id) {
+            return response()->json(null, 403);
+        }
 
-        $messages = [
-            'required' => trans('canvas::app.validation_required', [], $meta->locale),
-            'unique' => trans('canvas::app.validation_unique', [], $meta->locale),
-        ];
+        $user = User::query()->findOrFail($id);
 
-        validator($data, $rules, $messages)->validate();
+        $user->delete();
 
-        $meta->fill($data);
-
-        $meta->save();
-
-        return response()->json([
-            'user' => $meta->user,
-            'meta' => $meta->refresh(),
-        ], 201);
+        return response()->json(null, 204);
     }
 }

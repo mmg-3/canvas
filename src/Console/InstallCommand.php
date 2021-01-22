@@ -2,8 +2,11 @@
 
 namespace Canvas\Console;
 
+use Canvas\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class InstallCommand extends Command
 {
@@ -19,7 +22,21 @@ class InstallCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Install the resources and run migrations';
+    protected $description = 'Install the Canvas components and resources';
+
+    /**
+     * Create a new console command instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        parent::__construct();
+
+        if (file_exists(config_path('canvas.php'))) {
+            $this->setHidden(true);
+        }
+    }
 
     /**
      * Execute the console command.
@@ -31,11 +48,35 @@ class InstallCommand extends Command
         $this->callSilent('vendor:publish', ['--tag' => 'canvas-provider']);
         $this->callSilent('vendor:publish', ['--tag' => 'canvas-assets']);
         $this->callSilent('vendor:publish', ['--tag' => 'canvas-config']);
-        $this->callSilent('migrate');
+        $this->callSilent('canvas:migrate');
 
-        $this->registerCanvasServiceProvider();
+        if (! app()->runningUnitTests()) {
+            $this->installCanvasServiceProvider();
+        }
+
+        $this->createDefaultUser($email = 'email@example.com', $password = 'password');
 
         $this->info('Installation complete.');
+        $this->table(['Default Email', 'Default Password'], [[$email, $password]]);
+        $this->info('First things first, head to <comment>'.route('canvas.login').'</comment> and update your credentials.');
+    }
+
+    /**
+     * Create a new default user.
+     *
+     * @param string $email
+     * @param string $password
+     * @return void
+     */
+    protected function createDefaultUser(string $email, string $password)
+    {
+        User::create([
+            'id' => Uuid::uuid4()->toString(),
+            'name' => 'Example User',
+            'email' => $email,
+            'password' => Hash::make($password),
+            'role' => User::ADMIN,
+        ]);
     }
 
     /**
@@ -43,33 +84,14 @@ class InstallCommand extends Command
      *
      * @return void
      */
-    private function registerCanvasServiceProvider()
+    protected function installCanvasServiceProvider()
     {
-        $namespace = Str::replaceLast('\\', '', $this->laravel->getNamespace());
-        $appConfig = file_get_contents(config_path('app.php'));
-
-        if (Str::contains($appConfig, $namespace.'\\Providers\\CanvasServiceProvider::class')) {
-            return;
+        if (! Str::contains($appConfig = file_get_contents(config_path('app.php')), 'App\\Providers\\CanvasServiceProvider::class')) {
+            file_put_contents(config_path('app.php'), str_replace(
+                "App\\Providers\RouteServiceProvider::class,",
+                "App\\Providers\RouteServiceProvider::class,".PHP_EOL."        App\Providers\CanvasServiceProvider::class,",
+                $appConfig
+            ));
         }
-
-        $lineEndingCount = [
-            "\r\n" => substr_count($appConfig, "\r\n"),
-            "\r" => substr_count($appConfig, "\r"),
-            "\n" => substr_count($appConfig, "\n"),
-        ];
-
-        $eol = array_keys($lineEndingCount, max($lineEndingCount))[0];
-
-        file_put_contents(config_path('app.php'), str_replace(
-            "{$namespace}\\Providers\EventServiceProvider::class,".$eol,
-            "{$namespace}\\Providers\EventServiceProvider::class,".$eol."        {$namespace}\Providers\CanvasServiceProvider::class,".$eol,
-            $appConfig
-        ));
-
-        file_put_contents(app_path('Providers/CanvasServiceProvider.php'), str_replace(
-            "namespace App\Providers;",
-            "namespace {$namespace}\Providers;",
-            file_get_contents(app_path('Providers/CanvasServiceProvider.php'))
-        ));
     }
 }

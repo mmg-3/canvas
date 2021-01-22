@@ -1,11 +1,25 @@
-@import "../utilities/variables";
+@import '../utilities/variables';
 
 body {
     background-color: $body--bg;
     color: $body--color;
 
-    a, a:hover {
+    a,
+    a:hover {
         color: $body--color;
+    }
+
+    textarea::placeholder,
+    textarea::-webkit-input-placeholder {
+        color: $gray-600 !important;
+    }
+
+    .ql-editor {
+        color: $body--color;
+    }
+
+    div.ql-editor.ql-blank::before {
+        color: $gray-600;
     }
 
     .card {
@@ -16,9 +30,14 @@ body {
         border: 1px solid $gray-200;
         box-shadow: $box-shadow-lg;
 
+        & .dropdown-item:hover {
+            color: $body--color;
+            background-color: $gray-200;
+        }
+
         & .dropdown-item:active {
             color: $body--color;
-            background-color: $gray-100;
+            background-color: $gray-200;
         }
     }
 
@@ -30,6 +49,10 @@ body {
         color: $text--muted;
     }
 
+    .bg-list-muted {
+        background-color: $gray-100;
+    }
+
     .controls {
         background-color: $body--bg;
     }
@@ -38,7 +61,9 @@ body {
         background-color: $body--bg;
     }
 
-    .form-control, .input-group-text, .custom-select {
+    .form-control,
+    .input-group-text,
+    .custom-select {
         background-color: $gray-100 !important;
     }
 
@@ -47,7 +72,7 @@ body {
     }
 
     .hover-bg {
-        background-color: $gray-100;
+        background-color: $gray-200;
     }
 
     .fill-bg {

@@ -6,10 +6,9 @@ Hi! I'm really excited that you are interested in contributing to Canvas. The fo
 ## Table of Contents
 
 - [OS Tools](#before-you-get-started)
-- [Development Setup](#development-setup)
+- [Setup](#setup)
 	- [Git](#git)
 	- [Database](#database)
-	- [Authentication](#authentication)
 	- [Directories](#directories)
 	- [Installation](#installation)
 	- [Developing](#developing)
@@ -23,12 +22,17 @@ Hi! I'm really excited that you are interested in contributing to Canvas. The fo
 composer-link() {composer config repositories.local '{"type": "path", "url": "'$1'"}' --file composer.json}
 ```
 
-## Development Setup
+## Setup
+
+You can open a completely prebuilt, ready-to-code development environment using Gitpod.
+
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/austintoddj/canvas/tree/master)
+
+Alternatively, see instructions below to manually setting up an environment on your own machine.
 
 ### Git
 
-Fork the project on [https://github.com/cnvs/canvas](https://github.com/cnvs/canvas) to your own account. Then clone
- the fork with the following command:
+Fork the project on [https://github.com/austintoddj/canvas](https://github.com/austintoddj/canvas) to your own account. Then clone the fork with the following command:
 
 ```bash
 git clone https://github.com/your-account/canvas.git
@@ -54,26 +58,13 @@ Now update your `.env` file to reflect the new database:
 DB_CONNECTION=sqlite
 ```
 
-### Authentication
-
-> Note: It's assumed we're developing on Laravel 6.* since that's the current LTS
-
-From your Laravel app, create the authentication system and run the following commands:
-
-```bash
-composer require laravel/ui
-
-php artisan ui vue --auth
-php artisan migrate
-```
-
 ### Directories
 
 From your Laravel app, link the local version of Canvas using the `composer-link()` function:
 
 ```bash
 composer-link ../canvas/
-composer require cnvs/canvas @dev
+composer require austintoddj/canvas @dev
 ```
 
 ### Installation
@@ -81,62 +72,92 @@ composer require cnvs/canvas @dev
 Now that the projects are linked, run the following installation steps:
 
 ```bash
+# Install the Canvas package
 php artisan canvas:install
+
+# Link the storage directory
 php artisan storage:link
-php artisan canvas:ui
 ```
 
 Statistics are a core component to the app, so it's best to have a large dataset in place when developing. To
- generate some, add the following snippets to your Laravel app:
-
-Create a new class named `CanvasTrackingDataSeeder` and add this to the `run()` method:
+ generate some, add the following factories to your Laravel app:
 
 ```php
-\Illuminate\Support\Facades\DB::table('canvas_views')->truncate();
-\Illuminate\Support\Facades\DB::table('canvas_visits')->truncate();
+<?php
 
-factory(\Canvas\View::class, 2500)->create();
-factory(\Canvas\Visit::class, 2500)->create();
+namespace Database\Factories;
+
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+class CanvasVisitFactory extends Factory
+{
+    /**
+     * The name of the factory's corresponding model.
+     *
+     * @var string
+     */
+    protected $model = \Canvas\Models\Visit::class;
+
+    /**
+     * Define the model's default state.
+     *
+     * @return array
+     */
+    public function definition()
+    {
+        return [
+            'post_id' => \Canvas\Models\Post::all()->pluck('id')->random(),
+            'ip' => $this->faker->ipv4,
+            'agent' => $this->faker->userAgent,
+            'referer' => $this->faker->url,
+            'created_at' => today()->subDays(rand(0, 60))->toDateTimeString(),
+            'updated_at' => today()->subDays(rand(0, 60))->toDateTimeString(),
+        ];
+    }
+}
+```
+
+```php
+<?php
+
+namespace Database\Factories;
+
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+class CanvasViewFactory extends Factory
+{
+    /**
+     * The name of the factory's corresponding model.
+     *
+     * @var string
+     */
+    protected $model = \Canvas\Models\View::class;
+
+    /**
+     * Define the model's default state.
+     *
+     * @return array
+     */
+    public function definition()
+    {
+        return [
+            'post_id' => \Canvas\Models\Post::all()->pluck('id')->random(),
+            'ip' => $this->faker->ipv4,
+            'agent' => $this->faker->userAgent,
+            'referer' => $this->faker->url,
+            'created_at' => today()->subDays(rand(0, 60))->toDateTimeString(),
+            'updated_at' => today()->subDays(rand(0, 60))->toDateTimeString(),
+        ];
+    }
+}
+
 ```
 
 In the `run()` method of the `DatabaseSeeder`:
 
 ```php
-$this->call(CanvasTrackingDataSeeder::class);
-```
-
-Create a new factory named `ViewFactory` and add this definition:
-
-```php
-$factory->define(\Canvas\View::class, function (\Faker\Generator $faker) {
-    $timestamp = today()->subDays(rand(0, 60))->toDateTimeString();
-
-    return [
-        'post_id'    => \Canvas\Post::all()->pluck('id')->random(),
-        'ip' => $faker->ipv4,
-        'agent' => $faker->userAgent,
-        'referer' => $faker->url,
-        'created_at' => $timestamp,
-        'updated_at' => $timestamp,
-    ];
-});
-```
-
-Create a new factory named `VisitFactory` and add this definition:
-
-```php
-$factory->define(\Canvas\Visit::class, function (\Faker\Generator $faker) {
-    $timestamp = today()->subDays(rand(0, 60))->toDateTimeString();
-
-    return [
-        'post_id' => \Canvas\Post::all()->pluck('id')->random(),
-        'ip' => $faker->ipv4,
-        'agent' => $faker->userAgent,
-        'referer' => $faker->url,
-        'created_at' => $timestamp,
-        'updated_at' => $timestamp,
-    ];
-});
+\Database\Factories\CanvasViewFactory::new()->count(850)->create();
+\Database\Factories\CanvasVisitFactory::new()->count(500)->create();
 ```
 
 You can now run `php artisan db:seed` and you will have a substantial amount of views for each post.
@@ -155,5 +176,4 @@ cd public/vendor/canvas
 ln -s ../../../../canvas/public/* .
 ```
 
-Once you've made your changes, [create a pull request](https://github.com/cnvs/canvas/compare) from your fork to
- the `develop` branch of the project repository.
+Once you've made your changes, [create a pull request](https://github.com/austintoddj/canvas/compare) from your fork to the `develop` branch of the project repository.

@@ -1,22 +1,22 @@
 <template>
-    <div>
-        <page-header></page-header>
+    <section>
+        <page-header />
 
-        <main class="py-4">
+        <main class="pt-4">
             <div class="col-xl-8 offset-xl-2 col-lg-10 offset-lg-1 col-md-12 my-3">
                 <div class="my-3">
-                    <h2 class="mt-3">{{ i18n.settings }}</h2>
+                    <h3 class="mt-3">{{ trans.settings }}</h3>
                 </div>
 
-                <div class="mt-5 card shadow-lg" v-if="isReady">
+                <div v-if="isReady" class="mt-5 card shadow-lg">
                     <div class="card-body p-0">
                         <div class="d-flex rounded-top p-3 align-items-center">
                             <div class="mr-auto py-1">
-                                <p class="mb-1 font-weight-bold lead">
-                                    {{ i18n.weekly_digest }}
+                                <p class="mb-1 lead font-weight-bold text-truncate">
+                                    {{ trans.weekly_digest }}
                                 </p>
-                                <p class="mb-1 d-none d-lg-block">
-                                    {{ i18n.toggle_digest }}
+                                <p class="mb-1 d-none d-lg-block text-secondary">
+                                    {{ trans.toggle_digest }}
                                 </p>
                             </div>
                             <div class="ml-auto pl-3">
@@ -24,15 +24,15 @@
                                     <div class="form-group my-auto">
                                         <span class="switch switch-sm">
                                             <input
+                                                v-model="digest"
+                                                id="digest"
                                                 type="checkbox"
                                                 class="switch"
-                                                id="digest"
+                                                :checked="settings.user.digest"
                                                 @change="toggleDigest"
-                                                :checked="auth.digest"
-                                                v-model="auth.digest"
                                             />
                                             <label for="digest" class="mb-0 sr-only">
-                                                {{ i18n.weekly_digest }}
+                                                {{ trans.weekly_digest }}
                                             </label>
                                         </span>
                                     </div>
@@ -42,11 +42,11 @@
 
                         <div class="d-flex border-top p-3 align-items-center">
                             <div class="mr-auto py-1">
-                                <p class="mb-1 font-weight-bold lead">
-                                    {{ i18n.dark_mode }}
+                                <p class="mb-1 lead font-weight-bold text-truncate">
+                                    {{ trans.dark_mode }}
                                 </p>
-                                <p class="mb-1 d-none d-lg-block">
-                                    {{ i18n.toggle_dark_mode }}
+                                <p class="mb-1 d-none d-lg-block text-secondary">
+                                    {{ trans.toggle_dark_mode }}
                                 </p>
                             </div>
                             <div class="ml-auto pl-3">
@@ -54,15 +54,15 @@
                                     <div class="form-group my-auto">
                                         <span class="switch switch-sm">
                                             <input
+                                                v-model="darkMode"
+                                                id="darkMode"
                                                 type="checkbox"
                                                 class="switch"
-                                                id="darkMode"
+                                                :checked="settings.user.dark_mode"
                                                 @change="toggleDarkMode"
-                                                :checked="auth.darkMode"
-                                                v-model="auth.darkMode"
                                             />
                                             <label for="darkMode" class="mb-0 sr-only">
-                                                {{ i18n.dark_mode }}
+                                                {{ trans.dark_mode }}
                                             </label>
                                         </span>
                                     </div>
@@ -72,11 +72,11 @@
 
                         <div class="d-flex border-top p-3 align-items-center">
                             <div class="mr-auto py-1">
-                                <p class="mb-1 font-weight-bold lead">
-                                    {{ i18n.locale }}
+                                <p class="mb-1 lead font-weight-bold text-truncate">
+                                    {{ trans.locale }}
                                 </p>
-                                <p class="mb-1 d-none d-lg-block">
-                                    {{ i18n.select_your_language_or_region }}
+                                <p class="mb-1 d-none d-lg-block text-secondary">
+                                    {{ trans.select_your_language_or_region }}
                                 </p>
                             </div>
                             <div class="ml-auto pl-3">
@@ -84,16 +84,16 @@
                                     <div class="form-group row mt-3">
                                         <div class="col-12">
                                             <select
+                                                v-model="locale"
                                                 class="custom-select border-0"
-                                                @change="selectLocale"
-                                                v-model="auth.locale"
                                                 name="locale"
+                                                @change="selectLocale"
                                             >
                                                 <option
-                                                    v-for="code in config.languageCodes"
                                                     :key="code"
+                                                    v-for="code in settings.languageCodes"
                                                     :value="code"
-                                                    :selected="auth.locale === code"
+                                                    :selected="settings.user.locale === code"
                                                 >
                                                     {{ getLocaleDisplayName(code) }}
                                                 </option>
@@ -106,78 +106,94 @@
                     </div>
                 </div>
             </div>
-        </main>
 
-        <div class="mt-3 d-flex justify-content-center">
-            <p class="text-muted">{{ config.version }}</p>
-        </div>
-    </div>
+            <div class="pt-5 d-flex justify-content-center">
+                <a :href="latestRelease.link" class="text-muted text-decoration-none">
+                    {{ latestRelease.tag }}
+                </a>
+            </div>
+        </main>
+    </section>
 </template>
 
 <script>
-    import NProgress from 'nprogress';
-    import PageHeader from '../components/PageHeader';
-    import i18n from '../mixins/i18n';
-    import Hover from '../directives/Hover';
-    import store from '../store';
+import { mapGetters, mapState } from 'vuex';
+import Hover from '../directives/Hover';
+import NProgress from 'nprogress';
+import PageHeader from '../components/PageHeader';
 
-    export default {
-        name: 'edit-settings',
+export default {
+    name: 'edit-settings',
 
-        components: {
-            PageHeader,
-        },
+    components: {
+        PageHeader,
+    },
 
-        mixins: [ i18n ],
+    directives: {
+        Hover,
+    },
 
-        directives: {
-            Hover,
-        },
+    data() {
+        return {
+            digest: false,
+            locale: null,
+            darkMode: false,
+            isReady: false,
+        };
+    },
 
-        data() {
+    computed: {
+        ...mapState(['settings']),
+        ...mapGetters({
+            trans: 'settings/trans',
+        }),
+
+        latestRelease() {
             return {
-                isReady: false,
+                tag: this.settings.version,
+                link: `https://github.com/austintoddj/canvas/releases/tag/${this.settings.version}`,
             };
         },
+    },
 
-        created() {
-            this.isReady = true;
-            NProgress.done();
+    created() {
+        this.digest = this.settings.user.digest;
+        this.locale = this.settings.user.locale || this.settings.user.default_locale;
+        this.darkMode = this.settings.user.dark_mode;
+        this.isReady = true;
+        NProgress.done();
+    },
+
+    methods: {
+        getLocaleDisplayName(locale) {
+            let language = require('../data/languages.json')[locale];
+
+            return language.nativeName;
         },
 
-        computed: {
-            auth() {
-                return store.state.auth;
-            },
-
-            config() {
-                return store.state.config;
-            },
+        toggleDigest() {
+            this.$store.dispatch('settings/updateDigest', this.digest);
         },
 
-        methods: {
-            getLocaleDisplayName(locale) {
-                return i18n.methods.getDisplayName(locale)
-            },
+        selectLocale() {
+            this.$store.dispatch('settings/updateLocale', this.locale);
 
-            toggleDigest() {
-                store.dispatch('auth/updateDigest', this.auth);
-            },
-
-            selectLocale() {
-                store.dispatch('config/updateI18n', this.auth.locale);
-                store.dispatch('auth/updateLocale', this.auth);
-            },
-
-            toggleDarkMode() {
-                store.dispatch('auth/updateDarkMode', this.auth);
-
-                if (this.auth.darkMode === true) {
-                    document.body.setAttribute('data-theme', 'dark');
-                } else {
-                    document.body.removeAttribute('data-theme');
-                }
-            },
+            if (this.locale === 'ar' || this.locale === 'fa') {
+                document.body.setAttribute('data-lang', 'rtl');
+            } else {
+                document.body.removeAttribute('data-lang');
+            }
         },
-    };
+
+        toggleDarkMode() {
+            this.$store.dispatch('settings/updateDarkMode', this.darkMode);
+
+            if (this.darkMode === true) {
+                document.body.setAttribute('data-theme', 'dark');
+            } else {
+                document.body.removeAttribute('data-theme');
+            }
+        },
+    },
+};
 </script>

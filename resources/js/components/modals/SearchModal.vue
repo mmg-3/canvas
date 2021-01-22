@@ -1,5 +1,5 @@
 <template>
-    <div class="modal fade mh-100" tabindex="-1" role="dialog" aria-hidden="true" v-cloak>
+    <div v-cloak class="modal fade mh-100" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-body p-0">
@@ -15,7 +15,7 @@
                                     width="20"
                                     class="icon-search"
                                 >
-                                    <circle cx="10" cy="10" r="7" style="fill: none;" />
+                                    <circle cx="10" cy="10" r="7" style="fill: none" />
                                     <path
                                         class="fill-muted"
                                         d="M16.32 14.9l1.1 1.1c.4-.02.83.13 1.14.44l3 3a1.5 1.5 0 0 1-2.12 2.12l-3-3a1.5 1.5 0 0 1-.44-1.14l-1.1-1.1a8 8 0 1 1 1.41-1.41zM10 16a6 6 0 1 0 0-12 6 6 0 0 0 0 12z"
@@ -25,26 +25,25 @@
                         </div>
                         <vue-fuse
                             :keys="['name']"
-                            :list="searchIndex"
+                            :list="search.searchIndex"
                             :default-all="false"
                             :include-score="true"
                             :style="results.length > 0 ? 'border-radius: 0' : ''"
                             class="form-control form-control-lg border-0"
-                            :placeholder="i18n.search_canvas"
+                            :placeholder="trans.search_canvas"
                             event-name="search"
-                        >
-                        </vue-fuse>
+                        />
                     </div>
 
-                    <div v-for="entity in results" :key="entity.item.id">
+                    <div :key="entity.item.id" v-for="entity in results">
                         <router-link
                             :to="{
-                                    name: entity.item.route,
-                                    params: { id: entity.item.id },
-                                }"
+                                name: entity.item.route,
+                                params: { id: entity.item.id },
+                            }"
                             class="text-decoration-none"
-                            @click="clearResults()"
                             data-dismiss="modal"
+                            @click="clearResults()"
                         >
                             <div v-hover="{ class: `hover-bg` }" class="p-3">
                                 <div class="d-flex align-items-center">
@@ -66,7 +65,7 @@
                                         viewBox="0 0 24 24"
                                         class="icon-cheveron-right-circle"
                                     >
-                                        <circle cx="12" cy="12" r="10" style="fill: none;" />
+                                        <circle cx="12" cy="12" r="10" style="fill: none" />
                                         <path
                                             class="fill-light-gray"
                                             d="M10.3 8.7a1 1 0 0 1 1.4-1.4l4 4a1 1 0 0 1 0 1.4l-4 4a1 1 0 0 1-1.4-1.4l3.29-3.3-3.3-3.3z"
@@ -83,10 +82,10 @@
 </template>
 
 <script>
-import i18n from '../../mixins/i18n';
-import VueFuse from 'vue-fuse';
-import store from '../../store';
+import { mapGetters, mapState } from 'vuex';
 import Hover from '../../directives/Hover';
+import VueFuse from 'vue-fuse';
+import isEmpty from 'lodash/isEmpty';
 
 export default {
     name: 'search-modal',
@@ -99,21 +98,22 @@ export default {
         Hover,
     },
 
-    mixins: [i18n],
-
-    computed: {
-        auth() {
-            return store.state.auth;
-        },
+    data() {
+        return {
+            results: [],
+        };
     },
 
-    async created() {
-        await this.fetchPosts();
+    computed: {
+        ...mapState(['search']),
+        ...mapGetters({
+            trans: 'settings/trans',
+        }),
+    },
 
-        if (this.auth.admin === 1) {
-            await this.fetchTags();
-            await this.fetchTopics();
-            await this.fetchUsers();
+    created() {
+        if (isEmpty(this.search.searchIndex)) {
+            this.$store.dispatch('search/buildIndex');
         }
     },
 
@@ -123,61 +123,10 @@ export default {
         });
     },
 
-    data() {
-        return {
-            results: [],
-            searchIndex: []
-        };
-    },
-
     methods: {
-        fetchPosts() {
-            return this.request()
-                .get('/api/search/posts')
-                .then(({ data }) => {
-                    this.searchIndex.push(...data);
-                })
-                .catch(() => {
-                    // Add any error debugging...
-                });
-        },
-
-        fetchTags() {
-            return this.request()
-                .get('/api/search/tags')
-                .then(({ data }) => {
-                    this.searchIndex.push(...data);
-                })
-                .catch(() => {
-                    // Add any error debugging...
-                });
-        },
-
-        fetchTopics() {
-            return this.request()
-                .get('/api/search/topics')
-                .then(({ data }) => {
-                    this.searchIndex.push(...data);
-                })
-                .catch(() => {
-                    // Add any error debugging...
-                });
-        },
-
-        fetchUsers() {
-            return this.request()
-                .get('/api/search/users')
-                .then(({ data }) => {
-                    this.searchIndex.push(...data);
-                })
-                .catch(() => {
-                    // Add any error debugging...
-                });
-        },
-
         clearResults() {
             this.results = [];
-        }
+        },
     },
 };
 </script>

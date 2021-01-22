@@ -9,7 +9,7 @@
     <title><![CDATA[ {{ $data['name'] }} ]]></title>
     <updated>{{ $data['updated'] }}</updated>
 
-    @foreach($data['data'] as $post)
+    @foreach($data['posts'] as $post)
         <entry>
             <title>{{ $post['title'] }}</title>
             <author>

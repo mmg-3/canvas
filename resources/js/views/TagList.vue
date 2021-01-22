@@ -1,7 +1,7 @@
 <template>
-    <div>
+    <section>
         <page-header>
-            <template slot="menu">
+            <template slot="options">
                 <div class="dropdown">
                     <a
                         id="navbarDropdown"
@@ -16,7 +16,7 @@
                             xmlns="http://www.w3.org/2000/svg"
                             viewBox="0 0 24 24"
                             width="25"
-                            class="icon-dots-horizontal hover-light"
+                            class="icon-dots-horizontal"
                         >
                             <path
                                 class="fill-light-gray"
@@ -28,7 +28,7 @@
 
                     <div class="dropdown-menu dropdown-menu-right">
                         <router-link :to="{ name: 'create-tag' }" class="dropdown-item">
-                            {{ i18n.new_tag }}
+                            {{ trans.new_tag }}
                         </router-link>
                     </div>
                 </div>
@@ -38,16 +38,16 @@
         <main class="py-4">
             <div class="col-xl-8 offset-xl-2 col-lg-10 offset-lg-1 col-md-12">
                 <div class="my-3">
-                    <h2 class="mt-3">{{ i18n.tags }}</h2>
+                    <h3 class="mt-3">{{ trans.tags }}</h3>
 
                     <p class="mt-2 text-secondary">
-                        {{ i18n.tags_are_great_for }}
+                        {{ trans.tags_are_great_for }}
                     </p>
                 </div>
 
-                <div class="mt-5 card shadow-lg" v-if="isReady">
+                <div v-if="isReady" class="mt-5 card shadow-lg">
                     <div class="card-body p-0">
-                        <div v-for="(tag, index) in tags" :key="`${index}-${tag.id}`">
+                        <div :key="`${index}-${tag.id}`" v-for="(tag, index) in tags">
                             <router-link
                                 :to="{
                                     name: 'edit-tag',
@@ -66,18 +66,15 @@
                                 >
                                     <div class="d-flex align-items-center">
                                         <div class="mr-auto pl-2">
-                                            <p class="mb-0 py-1">
-                                                <span class="font-weight-bold lead">
-                                                    {{ tag.name }}
-                                                </span>
-                                            </p>
+                                            <p class="mb-0 py-1 lead font-weight-bold text-truncate">{{ tag.name }}</p>
                                         </div>
                                         <div class="ml-auto d-none d-md-inline-block">
-                                            <span class="text-muted mr-3"
-                                                >{{ suffixedNumber(tag.posts_count) }} {{ i18n.posts }}</span
+                                            <span class="text-secondary mr-3"
+                                                >{{ suffixedNumber(tag.posts_count) }}
+                                                {{ tag.posts_count == 1 ? trans.post : trans.posts }}</span
                                             >
                                             <span class="mr-3"
-                                                >{{ i18n.created }}
+                                                >{{ trans.created }}
                                                 {{ moment(tag.created_at).format('MMM D, YYYY') }}</span
                                             >
                                         </div>
@@ -88,7 +85,7 @@
                                             viewBox="0 0 24 24"
                                             class="icon-cheveron-right-circle"
                                         >
-                                            <circle cx="12" cy="12" r="10" style="fill: none;" />
+                                            <circle cx="12" cy="12" r="10" style="fill: none" />
                                             <path
                                                 class="fill-light-gray"
                                                 d="M10.3 8.7a1 1 0 0 1 1.4-1.4l4 4a1 1 0 0 1 0 1.4l-4 4a1 1 0 0 1-1.4-1.4l3.29-3.3-3.3-3.3z"
@@ -99,15 +96,15 @@
                             </router-link>
                         </div>
 
-                        <infinite-loading @infinite="fetchData" spinner="spiral">
-                            <span slot="no-more"></span>
+                        <infinite-loading spinner="spiral" @infinite="fetchTags">
+                            <span slot="no-more" />
                             <div slot="no-results" class="text-left">
                                 <div class="my-5">
                                     <p class="lead text-center text-muted mt-5">
-                                        {{ i18n.you_have_no_tags }}
+                                        {{ trans.you_have_no_tags }}
                                     </p>
                                     <p class="lead text-center text-muted mt-1">
-                                        {{ i18n.write_on_the_go }}
+                                        {{ trans.write_on_the_go }}
                                     </p>
                                 </div>
                             </div>
@@ -116,17 +113,17 @@
                 </div>
             </div>
         </main>
-    </div>
+    </section>
 </template>
 
 <script>
-import NProgress from 'nprogress';
-import isEmpty from 'lodash/isEmpty';
+import { mapGetters } from 'vuex';
 import Hover from '../directives/Hover';
 import InfiniteLoading from 'vue-infinite-loading';
+import NProgress from 'nprogress';
 import PageHeader from '../components/PageHeader';
+import isEmpty from 'lodash/isEmpty';
 import strings from '../mixins/strings';
-import i18n from '../mixins/i18n';
 
 export default {
     name: 'tag-list',
@@ -136,11 +133,11 @@ export default {
         PageHeader,
     },
 
-    mixins: [strings, i18n],
-
     directives: {
         Hover,
     },
+
+    mixins: [strings],
 
     data() {
         return {
@@ -150,14 +147,20 @@ export default {
         };
     },
 
-    created() {
-        this.fetchData();
+    computed: {
+        ...mapGetters({
+            trans: 'settings/trans',
+        }),
+    },
+
+    async created() {
+        await Promise.all([this.fetchTags()]);
         this.isReady = true;
         NProgress.done();
     },
 
     methods: {
-        fetchData($state) {
+        fetchTags($state) {
             if ($state) {
                 return this.request()
                     .get('/api/tags', {

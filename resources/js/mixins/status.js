@@ -7,11 +7,11 @@ export default {
         },
 
         isScheduled(date) {
-            return new Date(date) > new Date();
+            return !isEmpty(date) && new Date(date) > new Date();
         },
 
         isPublished(date) {
-            return new Date(date) < new Date();
+            return !isEmpty(date) && new Date(date) < new Date();
         },
     },
 };

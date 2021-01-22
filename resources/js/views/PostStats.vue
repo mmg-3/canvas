@@ -1,11 +1,10 @@
 <template>
-    <div>
+    <section>
         <page-header>
-            <template slot="menu">
+            <template slot="options" v-if="isReady && canEditPost">
                 <div class="dropdown">
                     <a
-                        id="navbarDropdown"
-                        class="nav-link pr-1"
+                        class="nav-link pr-0"
                         href="#"
                         role="button"
                         data-toggle="dropdown"
@@ -16,7 +15,7 @@
                             xmlns="http://www.w3.org/2000/svg"
                             viewBox="0 0 24 24"
                             width="25"
-                            class="icon-dots-horizontal hover-light"
+                            class="icon-dots-horizontal"
                         >
                             <path
                                 class="fill-light-gray"
@@ -25,23 +24,25 @@
                             />
                         </svg>
                     </a>
-
-                    <div class="dropdown-menu dropdown-menu-right">
-                        <router-link :to="{ name: 'edit-post', params: { id: id } }" class="dropdown-item">
-                            {{ i18n.edit_post }}
+                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuButton">
+                        <router-link
+                            :to="{ name: 'edit-post', params: { id: $route.params.id } }"
+                            class="dropdown-item"
+                        >
+                            {{ trans.edit_post }}
                         </router-link>
                     </div>
                 </div>
             </template>
         </page-header>
 
-        <main class="py-4" v-if="isReady">
+        <main v-if="isReady" class="py-4">
             <div class="col-xl-8 offset-xl-2 col-lg-10 offset-lg-1 col-md-12">
                 <div class="my-3">
-                    <h2 class="mt-3">{{ post.title  }}</h2>
+                    <h3 class="mt-3">{{ data.post.title }}</h3>
                     <p class="mt-2 text-secondary">
-                        {{ i18n.published }}
-                        {{ moment(post.published_at).fromNow() }}
+                        {{ trans.published }}
+                        {{ moment(data.post.published_at).fromNow() }}
                     </p>
                 </div>
 
@@ -49,24 +50,24 @@
                     <div class="card shadow-lg">
                         <div class="card-body p-3">
                             <p class="lead border-bottom">
-                                {{ i18n.lifetime_summary }}
+                                {{ trans.lifetime_summary }}
                             </p>
                             <div class="d-flex">
                                 <div class="mr-5">
                                     <p class="mb-0 small text-muted text-uppercase font-weight-bold">
-                                        {{ i18n.total_views }}
+                                        {{ trans.total_views }}
                                     </p>
                                     <h3 class="mt-1">
-                                        {{ suffixedNumber(totalViews) }}
+                                        {{ suffixedNumber(data.totalViews) }}
                                     </h3>
                                 </div>
 
                                 <div>
                                     <p class="mb-0 small text-muted text-uppercase font-weight-bold">
-                                        {{ i18n.average_reading_time }}
+                                        {{ trans.average_reading_time }}
                                     </p>
                                     <h3 class="mt-1">
-                                        {{ readTime }}
+                                        {{ data.readTime }}
                                     </h3>
                                 </div>
                             </div>
@@ -76,18 +77,18 @@
                     <div class="card shadow-lg">
                         <div class="card-body p-3">
                             <p class="lead border-bottom">
-                                {{ i18n.monthly_summary }}
+                                {{ trans.monthly_summary }}
                             </p>
                             <div class="d-flex">
                                 <div class="mr-5">
                                     <p class="mb-0 small text-muted text-uppercase font-weight-bold">
                                         <a
-                                            href="#"
                                             v-tooltip="{ placement: 'top' }"
+                                            href="#"
                                             class="text-decoration-none"
-                                            :title="i18n.views_info"
+                                            :title="trans.views_info"
                                         >
-                                            {{ i18n.views }}
+                                            {{ trans.views }}
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
                                                 width="17"
@@ -106,7 +107,7 @@
                                         </a>
                                     </p>
                                     <h3 class="mt-1 mb-2">
-                                        {{ suffixedNumber(monthlyViews) }}
+                                        {{ suffixedNumber(data.monthlyViews) }}
                                     </h3>
                                     <p class="small text-muted">
                                         <span v-if="viewsAreTrendingUp">
@@ -137,20 +138,19 @@
                                                 />
                                             </svg>
                                         </span>
-                                        {{ viewMonthOverMonthPercentage }}%
-                                        {{ i18n.from_last_month }}
+                                        {{ data.monthOverMonthViews.percentage }}% {{ trans.from_last_month }}
                                     </p>
                                 </div>
 
                                 <div>
                                     <p class="mb-0 small text-muted text-uppercase font-weight-bold">
                                         <a
-                                            href="#"
                                             v-tooltip="{ placement: 'top' }"
+                                            href="#"
                                             class="text-decoration-none"
-                                            :title="i18n.visits_info"
+                                            :title="trans.visits_info"
                                         >
-                                            {{ i18n.visitors }}
+                                            {{ trans.visitors }}
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
                                                 width="17"
@@ -169,7 +169,7 @@
                                         </a>
                                     </p>
                                     <h3 class="mt-1 mb-2">
-                                        {{ suffixedNumber(monthlyVisits) }}
+                                        {{ suffixedNumber(data.monthlyVisits) }}
                                     </h3>
                                     <p class="small text-muted">
                                         <span v-if="visitsAreTrendingUp">
@@ -200,8 +200,7 @@
                                                 />
                                             </svg>
                                         </span>
-                                        {{ visitMonthOverMonthPercentage }}%
-                                        {{ i18n.from_last_month }}
+                                        {{ data.monthOverMonthVisits.percentage }}% {{ trans.from_last_month }}
                                     </p>
                                 </div>
                             </div>
@@ -209,43 +208,44 @@
                     </div>
                 </div>
 
-                <line-chart
-                    :views="JSON.parse(viewPlotPoints)"
-                    :visits="JSON.parse(visitPlotPoints)"
-                    class="mt-5 mb-3"
-                />
+                <line-chart :views="plotViewPoints" :visits="plotVisitPoints" class="mt-5 mb-3" />
 
                 <div class="row justify-content-between">
                     <div class="col-md-6 mt-4">
-                        <h5 class="text-muted small text-uppercase font-weight-bold border-bottom pb-2">
-                            {{ i18n.views_by_traffic_source }}
+                        <h5 class="text-muted small text-uppercase font-weight-bold pb-2">
+                            {{ trans.views_by_traffic_source }}
                         </h5>
 
-                        <div v-if="topReferers">
-                            <div v-for="(views, host) in topReferers" :key="`${host}-${views}`">
-                                <div class="d-flex py-2 align-items-center">
+                        <div v-if="Object.keys(data.topReferers).length > 0">
+                            <div :key="`${host}-${views}`" v-for="(views, host, index) in data.topReferers">
+                                <div
+                                    class="d-flex py-2 align-items-center px-2"
+                                    :class="index % 2 === 0 ? 'bg-list-muted' : ''"
+                                >
                                     <div class="mr-auto">
-                                        <div v-if="host === i18n.other">
+                                        <div v-if="host === trans.other">
                                             <p class="mb-0 py-1">
                                                 <img
-                                                    :src="`https://favicons.githubusercontent.com/${host}`"
+                                                    :src="getDefaultFavicon(host)"
                                                     :style="
-                                                        user.darkMode === true
+                                                        settings.user.dark_mode === true
                                                             ? {
                                                                   filter: 'invert(100%)',
                                                               }
                                                             : ''
                                                     "
                                                     :alt="host"
+                                                    width="15"
+                                                    height="15"
                                                     class="mr-1"
                                                 />
                                                 <a
-                                                    href="#"
                                                     v-tooltip="{
                                                         placement: 'right',
                                                     }"
-                                                    class="text-decoration-none"
-                                                    :title="i18n.referer_unknown"
+                                                    href="#"
+                                                    class="text-decoration-none text-primary"
+                                                    :title="trans.referer_unknown"
                                                 >
                                                     {{ host }}
                                                     <svg
@@ -269,13 +269,15 @@
                                         <div v-else>
                                             <p class="mb-0 py-1">
                                                 <img
-                                                    :src="`https://favicons.githubusercontent.com/${host}`"
+                                                    :src="getDefaultFavicon(host)"
                                                     :alt="host"
+                                                    width="15"
+                                                    height="15"
                                                     class="mr-1"
                                                 />
                                                 <a
                                                     :href="'http://' + host"
-                                                    class="text-decoration-none"
+                                                    class="text-decoration-none text-primary"
                                                     target="_blank"
                                                 >
                                                     {{ host }}
@@ -285,54 +287,59 @@
                                     </div>
                                     <div class="ml-auto">
                                         <span class="text-muted"
-                                            >{{ suffixedNumber(monthlyViews) }} {{ i18n.views }}</span
+                                            >{{ suffixedNumber(data.monthlyViews) }} {{ trans.views }}</span
                                         >
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <p v-else class="py-2 font-italic">
-                            {{ i18n.waiting_until_more_data }}
+                            {{ trans.waiting_until_more_data }}
                         </p>
                     </div>
 
                     <div class="col-md-6 mt-4">
-                        <h5 class="text-muted small text-uppercase font-weight-bold border-bottom pb-2">
-                            {{ i18n.popular_reading_times }}
+                        <h5 class="text-muted small text-uppercase font-weight-bold pb-2">
+                            {{ trans.popular_reading_times }}
                         </h5>
 
-                        <div v-if="popularReadingTimes">
-                            <div v-for="(percentage, time) in popularReadingTimes" :key="`${time}-${percentage}`">
-                                <div class="d-flex py-2 align-items-center">
+                        <div v-if="Object.keys(data.popularReadingTimes).length > 0">
+                            <div
+                                :key="`${time}-${percentage}`"
+                                v-for="(percentage, time, index) in data.popularReadingTimes"
+                            >
+                                <div
+                                    class="d-flex py-2 align-items-center px-2"
+                                    :class="index % 2 === 0 ? 'bg-list-muted' : ''"
+                                >
                                     <div class="mr-auto">
                                         <p class="mb-0 py-1">
                                             {{ time }}
                                         </p>
                                     </div>
                                     <div class="ml-auto">
-                                        <span class="text-muted">{{ percentage + '%' }}</span>
+                                        <span class="text-muted">{{ `${percentage}%` }}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <p v-else class="py-2 font-italic">
-                            {{ i18n.waiting_until_more_data }}
+                            {{ trans.waiting_until_more_data }}
                         </p>
                     </div>
                 </div>
             </div>
         </main>
-    </div>
+    </section>
 </template>
 
 <script>
-import NProgress from 'nprogress';
-import Tooltip from '../directives/Tooltip';
+import { mapGetters, mapState } from 'vuex';
 import LineChart from '../components/LineChart';
-import i18n from '../mixins/i18n';
-import strings from '../mixins/strings';
+import NProgress from 'nprogress';
 import PageHeader from '../components/PageHeader';
-import store from '../store';
+import Tooltip from '../directives/Tooltip';
+import strings from '../mixins/strings';
 
 export default {
     name: 'post-stats',
@@ -342,34 +349,49 @@ export default {
         PageHeader,
     },
 
-    mixins: [i18n, strings],
-
     directives: {
         Tooltip,
     },
 
+    mixins: [strings],
+
     data() {
         return {
             id: this.$route.params.id,
-            post: null,
-            monthlyViews: 0,
-            monthlyVisits: 0,
-            totalViews: 0,
-            viewPlotPoints: {},
-            visitPlotPoints: {},
-            readTime: null,
-            topReferers: null,
-            popularReadingTimes: null,
-            viewMonthOverMonthDirection: null,
-            viewMonthOverMonthPercentage: null,
-            visitMonthOverMonthDirection: null,
-            visitMonthOverMonthPercentage: null,
+            data: null,
             isReady: false,
         };
     },
 
+    computed: {
+        ...mapState(['settings']),
+        ...mapGetters({
+            trans: 'settings/trans',
+        }),
+
+        canEditPost() {
+            return this.settings.user.id == this.data.post.user_id;
+        },
+
+        viewsAreTrendingUp() {
+            return this.data.monthOverMonthViews.direction === 'up';
+        },
+
+        visitsAreTrendingUp() {
+            return this.data.monthOverMonthVisits.direction === 'up';
+        },
+
+        plotViewPoints() {
+            return JSON.parse(this.data.traffic.views);
+        },
+
+        plotVisitPoints() {
+            return JSON.parse(this.data.traffic.visits);
+        },
+    },
+
     async created() {
-        await this.fetchStats();
+        await Promise.all([this.fetchStats()]);
         this.isReady = true;
         NProgress.done();
     },
@@ -377,49 +399,20 @@ export default {
     methods: {
         fetchStats() {
             return this.request()
-                .get('/api/stats/' + this.id)
+                .get(`/api/stats/${this.id}`)
                 .then(({ data }) => {
-                    this.post = data.post;
-                    this.readTime = data.read_time;
-                    this.popularReadingTimes = Array.isArray(data.popular_reading_times)
-                        ? null
-                        : data.popular_reading_times;
-                    this.topReferers = Array.isArray(data.top_referers) ? null : data.top_referers;
-                    this.monthlyViews = data.monthly_views;
-                    this.monthlyVisits = data.monthly_visits;
-                    this.totalViews = data.total_views;
-                    this.viewPlotPoints = data.traffic.views;
-                    this.visitPlotPoints = data.traffic.visits;
-                    this.viewMonthOverMonthDirection = data.month_over_month_views.direction;
-                    this.viewMonthOverMonthPercentage = data.month_over_month_views.percentage;
-                    this.visitMonthOverMonthDirection = data.month_over_month_visits.direction;
-                    this.visitMonthOverMonthPercentage = data.month_over_month_visits.percentage;
+                    this.data = data;
+                    NProgress.inc();
                 })
                 .catch(() => {
+                    this.$router.push({ name: 'stats' });
                     NProgress.done();
                 });
         },
-    },
 
-    computed: {
-        user() {
-            return store.state.user;
-        },
-
-        viewsAreTrendingUp() {
-            return this.viewMonthOverMonthDirection === 'up';
-        },
-
-        visitsAreTrendingUp() {
-            return this.visitMonthOverMonthDirection === 'up';
+        getDefaultFavicon(host) {
+            return `https://favicons.githubusercontent.com/${host}`;
         },
     },
 };
 </script>
-
-<style scoped>
-img {
-    width: 15px;
-    height: 15px;
-}
-</style>

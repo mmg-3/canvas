@@ -1,10 +1,11 @@
-@import "../utilities/variables";
+@import '../utilities/variables';
 
 body[data-theme='dark'] {
     background-color: $body--bg--dark;
     color: $body--color--dark;
 
-    a, a:hover {
+    a,
+    a:hover {
         color: $body--color--dark;
     }
 
@@ -14,6 +15,10 @@ body[data-theme='dark'] {
 
     .text-muted {
         color: $text--muted--dark;
+    }
+
+    .bg-list-muted {
+        background-color: $list--bg-dark;
     }
 
     .controls {
@@ -41,12 +46,20 @@ body[data-theme='dark'] {
         background-color: $body--bg--dark;
     }
 
+    .modal-footer {
+        border-top: 1px solid $gray-700;
+    }
+
     .border-top {
         border-top: 1px solid $gray-700 !important;
     }
 
     .border-bottom {
         border-bottom: 1px solid $gray-700 !important;
+    }
+
+    .border-left {
+        border-left: 1px solid $gray-700 !important;
     }
 
     .dropdown-menu {
@@ -56,6 +69,7 @@ body[data-theme='dark'] {
         border: 1px solid $gray-700;
 
         & .dropdown-item:hover {
+            color: $body--color--dark;
             background-color: lighten($body--bg--dark, 10%);
         }
 
@@ -64,12 +78,29 @@ body[data-theme='dark'] {
         }
     }
 
+    textarea {
+        color: $body--color--dark;
+    }
+
+    textarea::placeholder,
+    textarea::-webkit-input-placeholder {
+        color: $gray-600 !important;
+    }
+
     .ql-editor {
         color: $body--color--dark;
     }
 
     div.ql-editor.ql-blank::before {
         color: $gray-600;
+    }
+
+    .btn-circle {
+        border-color: $gray-700 !important;
+    }
+
+    .navbar-mini .btn {
+        border-color: $gray-700 !important;
     }
 
     select.input {
@@ -89,7 +120,8 @@ body[data-theme='dark'] {
         color: $gray-400;
     }
 
-    .multiselect__input, .multiselect__single {
+    .multiselect__input,
+    .multiselect__single {
         color: $gray-400;
     }
 
@@ -101,7 +133,7 @@ body[data-theme='dark'] {
         border-radius: $border-radius;
         background-color: #71809630;
         border: none;
-        padding-left: .75rem;
+        padding-left: 0.75rem;
     }
 
     .multiselect__option--selected {
@@ -129,7 +161,9 @@ body[data-theme='dark'] {
         fill: $body--color--dark;
     }
 
-    .form-control, .input-group-text, .custom-select {
+    .form-control,
+    .input-group-text,
+    .custom-select {
         color: $body--color--dark;
         background-color: #71809630 !important;
     }

@@ -1,19 +1,7 @@
 <template>
-    <div
-        v-cloak
-        class="position-relative px-4"
-        v-closable="{
-            exclude: ['toggle'],
-            handler: 'handleClicksOutsideEditor',
-        }"
-    >
-        <div class="sidebar-controls" ref="sidebarControls">
-            <button
-                @click="toggleSidebarControls"
-                ref="toggle"
-                class="btn btn-outline-light btn-circle border"
-                type="button"
-            >
+    <div v-cloak class="position-relative">
+        <div v-closable="handleClicksOutsideEditor" ref="sidebarControls" class="sidebar-controls">
+            <button ref="toggle" class="btn btn-circle border" type="button" @click="toggleSidebarControls">
                 <span v-if="controlIsActive">
                     <svg xmlns="http://www.w3.org/2000/svg" width="26" viewBox="0 0 24 24" class="icon-close">
                         <path
@@ -25,7 +13,7 @@
                 </span>
                 <span v-else>
                     <svg xmlns="http://www.w3.org/2000/svg" width="26" viewBox="0 0 24 24" class="icon-add-circle">
-                        <circle cx="12" cy="12" r="10" style="fill: none;" />
+                        <circle cx="12" cy="12" r="10" style="fill: none" />
                         <path
                             class="fill-body-color"
                             d="M13 11h4a1 1 0 0 1 0 2h-4v4a1 1 0 0 1-2 0v-4H7a1 1 0 0 1 0-2h4V7a1 1 0 0 1 2 0v4z"
@@ -34,7 +22,7 @@
                 </span>
             </button>
             <div class="controls pl-3 d-none">
-                <button @click="showEmbedImageModal" class="btn btn-outline-light btn-circle border mr-1" type="button">
+                <button class="btn btn-circle border mr-1" type="button" @click="showEmbedImageModal">
                     <svg xmlns="http://www.w3.org/2000/svg" width="26" viewBox="0 0 24 24" class="icon-camera">
                         <path
                             class="fill-body-color"
@@ -43,32 +31,7 @@
                         <path class="fill-body-color" d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
                     </svg>
                 </button>
-                <button @click="showEmbedVideoModal" class="btn btn-outline-light btn-circle border mr-1" type="button">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="26" viewBox="0 0 24 24" class="icon-play">
-                        <circle cx="12" cy="12" r="10" class="fill-body-color" />
-                        <path
-                            class="fill-bg"
-                            d="M15.51 11.14a1 1 0 0 1 0 1.72l-5 3A1 1 0 0 1 9 15V9a1 1 0 0 1 1.51-.86l5 3z"
-                        />
-                    </svg>
-                </button>
-                <button @click="showEmbedLinkModal" class="btn btn-outline-light btn-circle border mr-1" type="button">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="26" viewBox="0 0 24 24" class="icon-link">
-                        <path
-                            class="fill-body-color"
-                            d="M19.48 13.03l-.02-.03a1 1 0 1 1 1.75-.98A6 6 0 0 1 16 21h-4a6 6 0 1 1 0-12h1a1 1 0 0 1 0 2h-1a4 4 0 1 0 0 8h4a4 4 0 0 0 3.48-5.97z"
-                        />
-                        <path
-                            class="fill-body-color"
-                            d="M4.52 10.97l.02.03a1 1 0 1 1-1.75.98A6 6 0 0 1 8 3h4a6 6 0 1 1 0 12h-1a1 1 0 0 1 0-2h1a4 4 0 1 0 0-8H8a4 4 0 0 0-3.48 5.97z"
-                        />
-                    </svg>
-                </button>
-                <button
-                    @click="showEmbedContentModal"
-                    class="btn btn-outline-light btn-circle border mr-1"
-                    type="button"
-                >
+                <button class="btn btn-circle border mr-1" type="button" @click="showEmbedContentModal">
                     <svg xmlns="http://www.w3.org/2000/svg" width="26" viewBox="0 0 24 24" class="icon-code">
                         <rect width="18" height="18" x="3" y="3" class="fill-bg" rx="2" />
                         <path
@@ -77,7 +40,7 @@
                         />
                     </svg>
                 </button>
-                <button @click="insertDivider" class="btn btn-outline-light btn-circle border mr-2" type="button">
+                <button class="btn btn-circle border mr-2" type="button" @click="insertDivider">
                     <svg xmlns="http://www.w3.org/2000/svg" width="26" viewBox="0 0 24 24" class="icon-dots-horizontal">
                         <path
                             class="fill-body-color"
@@ -89,14 +52,14 @@
             </div>
         </div>
 
-        <div ref="editor"></div>
+        <div ref="editor" v-cloak class="mb-5" />
 
         <nav class="navbar fixed-bottom navbar-expand-sm mt-5 d-xl-none p-0 navbar-mini shadow">
             <div class="btn-group d-flex justify-content-center">
                 <button
-                    @click="showEmbedImageModal"
-                    class="btn btn-outline-light border border-bottom-0 border-left-0 py-2"
+                    class="btn border border-bottom-0 border-left-0 py-2"
                     type="button"
+                    @click="showEmbedImageModal"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="26" viewBox="0 0 24 24" class="icon-camera">
                         <path
@@ -107,38 +70,9 @@
                     </svg>
                 </button>
                 <button
-                    @click="showEmbedVideoModal"
-                    class="btn btn-outline-light border border-bottom-0 border-left-0 py-2"
+                    class="btn border border-bottom-0 border-left-0 py-2"
                     type="button"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="26" viewBox="0 0 24 24" class="icon-play">
-                        <circle cx="12" cy="12" r="10" class="fill-body-color" />
-                        <path
-                            class="fill-bg"
-                            d="M15.51 11.14a1 1 0 0 1 0 1.72l-5 3A1 1 0 0 1 9 15V9a1 1 0 0 1 1.51-.86l5 3z"
-                        />
-                    </svg>
-                </button>
-                <button
-                    @click="showEmbedLinkModal"
-                    class="btn btn-outline-light border border-bottom-0 border-left-0 py-2"
-                    type="button"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="26" viewBox="0 0 24 24" class="icon-link">
-                        <path
-                            class="fill-body-color"
-                            d="M19.48 13.03l-.02-.03a1 1 0 1 1 1.75-.98A6 6 0 0 1 16 21h-4a6 6 0 1 1 0-12h1a1 1 0 0 1 0 2h-1a4 4 0 1 0 0 8h4a4 4 0 0 0 3.48-5.97z"
-                        />
-                        <path
-                            class="fill-body-color"
-                            d="M4.52 10.97l.02.03a1 1 0 1 1-1.75.98A6 6 0 0 1 8 3h4a6 6 0 1 1 0 12h-1a1 1 0 0 1 0-2h1a4 4 0 1 0 0-8H8a4 4 0 0 0-3.48 5.97z"
-                        />
-                    </svg>
-                </button>
-                <button
                     @click="showEmbedContentModal"
-                    class="btn btn-outline-light border border-bottom-0 border-left-0 py-2"
-                    type="button"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="26" viewBox="0 0 24 24" class="icon-code">
                         <rect width="18" height="18" x="3" y="3" class="fill-bg" rx="2" />
@@ -148,11 +82,7 @@
                         />
                     </svg>
                 </button>
-                <button
-                    @click="insertDivider"
-                    class="btn btn-outline-light border border-bottom-0 border-right-0 py-2"
-                    type="button"
-                >
+                <button class="btn border border-bottom-0 border-right-0 py-2" type="button" @click="insertDivider">
                     <svg xmlns="http://www.w3.org/2000/svg" width="26" viewBox="0 0 24 24" class="icon-dots-horizontal">
                         <path
                             class="fill-body-color"
@@ -164,100 +94,77 @@
             </div>
         </nav>
 
+        <embed-content-modal ref="embedContentModal" @adding-embed-content="insertEmbedContent" />
         <embed-image-modal
             ref="embedImageModal"
-            @addingEmbedImage="insertEmbedImage"
-            @removingEmbedImage="removeEmbedImage"
+            @adding-embed-image="insertEmbedImage"
+            @removing-embed-image="removeEmbedImage"
         />
-
-        <embed-video-modal ref="embedVideoModal" @addingEmbedVideo="insertEmbedVideo" />
-
-        <embed-link-modal ref="embedLinkModal" @addingEmbedLink="insertEmbedLink" />
-
-        <embed-content-modal ref="embedContentModal" @addingEmbedContent="insertEmbedContent" />
     </div>
 </template>
 
 <script>
+import { mapGetters } from 'vuex';
 import $ from 'jquery';
-import Quill from 'quill';
-import { mapState } from 'vuex';
-import Parchment from 'parchment';
-import debounce from 'lodash/debounce';
-import EmbedContentBlot from './EmbedContentBlot';
-import EmbedVideoBlot from './EmbedVideoBlot';
-import EmbedImageBlot from './EmbedImageBlot';
-import EmbedLinkModal from './EmbedLinkModal';
-import EmbedContentModal from './EmbedContentModal';
-import EmbedVideoModal from './EmbedVideoModal';
-import EmbedImageModal from './EmbedImageModal';
-import DividerBlot from './DividerBlot';
-import EmbedLinkBlot from './EmbedLinkBlot';
 import Closable from '../../../js/directives/Closable';
+import DividerBlot from './DividerBlot';
+import EmbedContentBlot from './EmbedContentBlot';
+import EmbedContentModal from './EmbedContentModal';
+import EmbedImageBlot from './EmbedImageBlot';
+import EmbedImageModal from './EmbedImageModal';
+import Parchment from 'parchment';
+import Quill from 'quill';
+import debounce from 'lodash/debounce';
 
 export default {
     name: 'quill-editor',
-
-    props: {
-        value: {
-            type: String,
-            default: '',
-        },
-    },
 
     directives: {
         Closable,
     },
 
     components: {
-        EmbedLinkModal,
-        EmbedVideoModal,
         EmbedContentModal,
         EmbedImageModal,
+    },
+
+    props: {
+        post: {
+            type: Object,
+            required: true,
+        },
     },
 
     data() {
         return {
             editor: null,
             controlIsActive: false,
-            trans: JSON.parse(window.Canvas.locale.translations),
         };
     },
 
-    mounted() {
-        this.editor = this.createEditor();
-        this.handleEditorValue();
+    computed: {
+        ...mapGetters({
+            trans: 'settings/trans',
+        }),
+    },
 
-        // Render any Tweets inside the editor
-        let tweets = document.querySelectorAll('div.ql-tweet');
-        for (let i = 0; i < tweets.length; i++) {
-            while (tweets[i].firstChild) {
-                tweets[i].removeChild(tweets[i].firstChild);
-            }
-
-            window.twttr.widgets.createTweet(tweets[i].dataset.id, tweets[i], {
-                theme: !window.Canvas.darkMode ? 'light' : 'dark',
-            });
-        }
+    async mounted() {
+        await Promise.all([this.createEditor(), this.handleEditorValue()]);
 
         this.handleClicksInsideEditor();
         this.initSideControls();
-    },
 
-    computed: mapState(['activePost']),
-
-    watch: {
-        'activePost.body'() {
+        this.editor.on('text-change', () => {
+            this.controlIsActive = false;
+            this.post.body = this.editor.getText() ? this.editor.root.innerHTML : '';
             this.update();
-        },
+        });
     },
 
     methods: {
         createEditor() {
             Quill.register(DividerBlot, true);
-            Quill.register(EmbedLinkBlot, true);
             Quill.register(EmbedImageBlot, true);
-            Quill.register(EmbedVideoBlot, true);
             Quill.register(EmbedContentBlot, true);
 
             const icons = Quill.import('ui/icons');
@@ -274,7 +181,7 @@ export default {
                 },
                 theme: 'bubble',
                 scrollingContainer: 'html, body',
-                placeholder: this.trans.app.tell_your_story,
+                placeholder: this.trans.tell_your_story,
             });
 
             /**
@@ -285,18 +192,13 @@ export default {
             let tooltip = quill.theme.tooltip;
             let input = tooltip.root.querySelector('input[data-link]');
 
-            input.dataset.link = this.trans.app.paste_or_type_a_link;
+            input.dataset.link = this.trans.paste_or_type_a_link;
 
-            return quill;
+            return (this.editor = quill);
         },
 
         handleEditorValue() {
-            this.editor.root.innerHTML = this.$store.getters.activePost.body;
-
-            this.editor.on('text-change', () => {
-                this.controlIsActive = false;
-                this.$store.dispatch('updatePostBody', this.editor.getText() ? this.editor.root.innerHTML : '');
-            });
+            return (this.editor.root.innerHTML = this.post.body);
         },
 
         handleClicksInsideEditor() {
@@ -305,17 +207,13 @@ export default {
 
                 if (blot instanceof EmbedImageBlot) {
                     let values = blot.value(blot.domNode)['embed-image'];
-
                     values.existingBlot = blot;
-
                     this.showEmbedImageModal(values);
                 }
 
                 if (blot instanceof EmbedContentBlot) {
                     let content = blot.value(blot.domNode)['embed-content'];
-
                     content.existingBlot = blot;
-
                     this.showEmbedContentModal(content);
                 }
             });
@@ -334,30 +232,29 @@ export default {
             this.editor.on(Quill.events.EDITOR_CHANGE, (eventType, range) => {
                 let sidebarControls = this.$refs.sidebarControls;
 
-                if (eventType !== Quill.events.SELECTION_CHANGE) return;
+                if (eventType !== Quill.events.SELECTION_CHANGE) {
+                    return;
+                }
 
-                if (range == null) return;
+                if (range == null) {
+                    return;
+                }
 
                 if (range.length === 0) {
                     let [block] = this.editor.scroll.descendant(Block, range.index);
 
                     if (block != null && block.domNode.firstChild instanceof HTMLBRElement) {
                         let lineBounds = this.editor.getBounds(range);
-
                         sidebarControls.classList.remove('active');
-
                         sidebarControls.style.display = 'block';
-
                         sidebarControls.style.left = lineBounds.left - 50 + 'px';
                         sidebarControls.style.top = lineBounds.top - 2 + 'px';
                     } else {
                         sidebarControls.style.display = 'none';
-
                         sidebarControls.classList.remove('active');
                     }
                 } else {
                     sidebarControls.style.display = 'none';
-
                     sidebarControls.classList.remove('active');
                 }
             });
@@ -376,26 +273,12 @@ export default {
         },
 
         showEmbedImageModal(data = null) {
-            this.$emit('openingEmbedImageModal', data);
-
+            this.$emit('opening-embed-image-modal', data);
             $(this.$refs.embedImageModal.$el).modal('show');
         },
 
-        showEmbedVideoModal(data = null) {
-            this.$emit('openingEmbedVideoModal', data);
-
-            $(this.$refs.embedVideoModal.$el).modal('show');
-        },
-
-        showEmbedLinkModal(data = null) {
-            this.$emit('openingEmbedLinkModal', data);
-
-            $(this.$refs.embedLinkModal.$el).modal('show');
-        },
-
         showEmbedContentModal(data = null) {
-            this.$emit('openingEmbedContentModal', data);
-
+            this.$emit('opening-embed-content-modal', data);
             $(this.$refs.embedContentModal.$el).modal('show');
         },
 
@@ -411,34 +294,14 @@ export default {
             }
 
             let range = this.editor.getSelection(true);
-
             this.editor.insertEmbed(range.index, 'embed-image', values, Quill.sources.USER);
-
             this.editor.setSelection(range.index + 1, Quill.sources.SILENT);
         },
 
         removeEmbedImage({ existingBlot }) {
             let range = this.editor.getSelection(true);
-
             existingBlot.remove();
-
             this.editor.setSelection(range.index - 1, Quill.sources.SILENT);
-        },
-
-        insertEmbedLink({ url }) {
-            let range = this.editor.getSelection(true);
-
-            this.editor.insertEmbed(range.index, 'embed-link', url, Quill.sources.USER);
-
-            this.editor.setSelection(range.index + 1, Quill.sources.SILENT);
-        },
-
-        insertEmbedVideo({ url }) {
-            let range = this.editor.getSelection(true);
-
-            this.editor.insertEmbed(range.index, 'embed-video', url, Quill.sources.USER);
-
-            this.editor.setSelection(range.index + 1, Quill.sources.SILENT);
         },
 
         insertEmbedContent({ content, existingBlot }) {
@@ -452,21 +315,18 @@ export default {
             }
 
             this.editor.insertEmbed(range.index, 'embed-content', values, Quill.sources.USER);
-
             this.editor.setSelection(range.index + 1, Quill.sources.SILENT);
         },
 
         insertDivider() {
             let range = this.editor.getSelection(true);
-
             this.editor.insertText(range.index, '', Quill.sources.USER);
             this.editor.insertEmbed(range.index, 'divider', true, Quill.sources.USER);
-
             this.editor.setSelection(range.index + 2, Quill.sources.SILENT);
         },
 
         update: debounce(function () {
-            this.$parent.save();
+            this.$emit('update-post');
         }, 3000),
     },
 };
@@ -479,19 +339,17 @@ export default {
 .ql-container {
     font-size: 1.1rem;
     line-height: 2;
+    word-wrap: normal;
     font-family: $font-family-serif;
-    margin: 0;
-    height: 100%;
-    position: relative;
-    box-sizing: border-box;
 }
 
 .ql-editor {
     font-family: $font-family-serif;
-    font-size: 1.1rem;
-    line-height: 2;
-    padding: 0;
-    overflow-y: visible;
+    font-size: 1.1rem !important;
+    line-height: 2 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    overflow-y: visible !important;
     min-width: 100%;
     display: -webkit-box;
     display: -ms-flexbox;
@@ -503,7 +361,7 @@ export default {
 }
 
 .ql-editor p {
-    margin: 1.5em 0 0 0;
+    margin: 1.5em 0 0 0 !important;
 }
 
 .ql-editor a {
@@ -581,17 +439,13 @@ div.embedded_image[data-layout='wide'] {
 }
 
 .ql-editor pre.ql-syntax {
-    border-radius: $border-radius;
-    padding: 1em;
-    margin-top: 2em;
+    border-radius: $border-radius !important;
+    padding: 1em !important;
+    margin-top: 2em !important;
 }
 
 .ql-editor.ql-blank::before {
     left: 0 !important;
-}
-
-.ql-editor.ql-blank p {
-    /*margin: 1.5em 0 !important;*/
 }
 
 .btn-circle {
@@ -644,26 +498,6 @@ div.embedded_image[data-layout='wide'] {
     position: relative;
     left: 50%;
     margin-left: -50vw;
-}
-
-div.ql-tweet {
-    display: flex;
-    justify-content: center;
-}
-
-div.ql-video {
-    position: relative;
-    overflow: hidden;
-    padding-top: 56.25%;
-}
-
-div.ql-video iframe {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border: 0;
 }
 
 @media screen and (max-width: 1024px) {

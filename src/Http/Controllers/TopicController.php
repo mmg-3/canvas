@@ -2,11 +2,11 @@
 
 namespace Canvas\Http\Controllers;
 
+use Canvas\Http\Requests\TopicRequest;
 use Canvas\Models\Topic;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Illuminate\Validation\Rule;
 use Ramsey\Uuid\Uuid;
 
 class TopicController extends Controller
@@ -19,7 +19,8 @@ class TopicController extends Controller
     public function index(): JsonResponse
     {
         return response()->json(
-            Topic::latest()
+            Topic::query()
+                 ->latest()
                  ->withCount('posts')
                  ->paginate(), 200
         );
@@ -40,47 +41,29 @@ class TopicController extends Controller
     /**
      * Store a newly created resource in storage.
      *
+     * @param TopicRequest $request
      * @param $id
      * @return JsonResponse
      */
-    public function store($id): JsonResponse
+    public function store(TopicRequest $request, $id): JsonResponse
     {
-        $topic = Topic::find($id);
+        $data = $request->validated();
+
+        $topic = Topic::query()->find($id);
 
         if (! $topic) {
-            if ($topic = Topic::onlyTrashed()->firstWhere('slug', request('slug'))) {
+            if ($topic = Topic::onlyTrashed()->firstWhere('slug', $data['slug'])) {
                 $topic->restore();
+
+                return response()->json($topic->refresh(), 201);
             } else {
                 $topic = new Topic(['id' => $id]);
             }
         }
 
-        $data = [
-            'id' => $id,
-            'name' => request('name'),
-            'slug' => request('slug'),
-            'user_id' => request()->user()->id,
-        ];
-
-        $rules = [
-            'name' => 'required',
-            'slug' => [
-                'required',
-                'alpha_dash',
-                Rule::unique('canvas_topics')->where(function ($query) use ($data) {
-                    return $query->where('slug', $data['slug'])->where('user_id', $data['user_id']);
-                })->ignore($id)->whereNull('deleted_at'),
-            ],
-        ];
-
-        $messages = [
-            'required' => trans('canvas::app.validation_required', [], optional($topic->userMeta)->locale),
-            'unique' => trans('canvas::app.validation_unique', [], optional($topic->userMeta)->locale),
-        ];
-
-        validator($data, $rules, $messages)->validate();
-
         $topic->fill($data);
+
+        $topic->user_id = $topic->user_id ?? request()->user('canvas')->id;
 
         $topic->save();
 
@@ -92,11 +75,10 @@ class TopicController extends Controller
      *
      * @param $id
      * @return JsonResponse
-     * @throws Exception
      */
     public function show($id): JsonResponse
     {
-        $topic = Topic::find($id);
+        $topic = Topic::query()->find($id);
 
         return $topic ? response()->json($topic, 200) : response()->json(null, 404);
     }
@@ -106,11 +88,10 @@ class TopicController extends Controller
      *
      * @param $id
      * @return JsonResponse
-     * @throws Exception
      */
     public function showPosts($id): JsonResponse
     {
-        $topic = Topic::with('posts')->find($id);
+        $topic = Topic::query()->with('posts')->find($id);
 
         return $topic ? response()->json($topic->posts()->withCount('views')->paginate(), 200) : response()->json(null, 200);
     }
@@ -120,10 +101,11 @@ class TopicController extends Controller
      *
      * @param $id
      * @return mixed
+     * @throws Exception
      */
     public function destroy($id)
     {
-        $topic = Topic::findOrFail($id);
+        $topic = Topic::query()->findOrFail($id);
 
         $topic->delete();
 

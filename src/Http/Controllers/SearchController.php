@@ -5,8 +5,8 @@ namespace Canvas\Http\Controllers;
 use Canvas\Models\Post;
 use Canvas\Models\Tag;
 use Canvas\Models\Topic;
-use Exception;
-use Illuminate\Foundation\Auth\User;
+use Canvas\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 
@@ -16,11 +16,18 @@ class SearchController extends Controller
      * Display the specified resource.
      *
      * @return JsonResponse
-     * @throws Exception
      */
     public function showPosts(): JsonResponse
     {
-        $posts = Post::forUser(request()->user())->select('id', 'title')->latest()->get();
+        $posts = Post::query()
+                     ->when(request()->user('canvas')->isContributor, function (Builder $query) {
+                         return $query->where('user_id', request()->user('canvas')->id);
+                     }, function (Builder $query) {
+                         return $query;
+                     })
+                     ->select('id', 'title')
+                     ->latest()
+                     ->get();
 
         $posts->map(function ($post) {
             $post['name'] = $post->title;
@@ -37,11 +44,13 @@ class SearchController extends Controller
      * Display the specified resource.
      *
      * @return JsonResponse
-     * @throws Exception
      */
     public function showTags(): JsonResponse
     {
-        $tags = Tag::select('id', 'name')->latest()->get();
+        $tags = Tag::query()
+                   ->select('id', 'name')
+                   ->latest()
+                   ->get();
 
         $tags->map(function ($tag) {
             $tag['type'] = 'Tag';
@@ -57,11 +66,13 @@ class SearchController extends Controller
      * Display the specified resource.
      *
      * @return JsonResponse
-     * @throws Exception
      */
     public function showTopics(): JsonResponse
     {
-        $topics = Topic::select('id', 'name')->latest()->get();
+        $topics = Topic::query()
+                       ->select('id', 'name')
+                       ->latest()
+                       ->get();
 
         $topics->map(function ($topic) {
             $topic['type'] = 'Topic';
@@ -77,11 +88,13 @@ class SearchController extends Controller
      * Display the specified resource.
      *
      * @return JsonResponse
-     * @throws Exception
      */
     public function showUsers(): JsonResponse
     {
-        $users = resolve(config('canvas.user', User::class))->select('id', 'name')->latest()->get();
+        $users = User::query()
+                     ->select('id', 'name', 'email')
+                     ->latest()
+                     ->get();
 
         $users->map(function ($user) {
             $user['type'] = 'User';

@@ -2,161 +2,139 @@
 
 namespace Canvas\Tests\Http\Controllers;
 
-use Canvas\Http\Middleware\Session;
 use Canvas\Models\Post;
 use Canvas\Models\Tag;
 use Canvas\Models\Topic;
-use Canvas\Models\UserMeta;
 use Canvas\Tests\TestCase;
-use Illuminate\Auth\Middleware\Authorize;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
+/**
+ * Class SearchControllerTest.
+ *
+ * @covers \Canvas\Http\Controllers\SearchController
+ */
 class SearchControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @return void
-     */
-    protected function setUp(): void
+    public function testAContributorCanOnlySearchTheirOwnPosts(): void
     {
-        parent::setUp();
-
-        $this->withoutMiddleware([
-            Authorize::class,
-            Session::class,
-            VerifyCsrfToken::class,
+        factory(Post::class, 3)->create([
+            'user_id' => $this->contributor->id,
         ]);
 
-        $this->registerAssertJsonExactFragmentMacro();
-    }
-
-    /** @test */
-    public function it_can_fetch_all_posts_for_an_admin_user()
-    {
-        $meta = factory(UserMeta::class)->create([
-            'admin' => 1,
+        factory(Post::class)->create([
+            'user_id' => $this->admin->id,
         ]);
 
-        factory(Post::class, 2)->create([
-            'user_id' => $meta->user->id,
-        ]);
-
-        factory(Post::class, 1)->create([
-            'user_id' => 2,
-            'published_at' => now()->addWeek(),
-        ]);
-
-        $response = $this->actingAs($meta->user)
-             ->getJson('canvas/api/search/posts')
-             ->assertSuccessful();
-
-        $this->assertCount(3, $response->decodeResponseJson());
-        $this->assertArrayHasKey('id', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('title', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('name', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('type', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('route', $response->decodeResponseJson()[0]);
-    }
-
-    /** @test */
-    public function it_can_only_fetch_user_posts_for_a_non_admin_user()
-    {
-        $meta = factory(UserMeta::class)->create([
-            'admin' => 0,
-        ]);
-
-        factory(Post::class, 2)->create([
-            'user_id' => $meta->user->id,
-        ]);
-
-        factory(Post::class, 1)->create([
-            'user_id' => 2,
-            'published_at' => now()->addWeek(),
-        ]);
-
-        $response = $this->actingAs($meta->user)
+        $response = $this->actingAs($this->contributor, 'canvas')
                          ->getJson('canvas/api/search/posts')
-                         ->assertSuccessful();
+                         ->assertSuccessful()
+                         ->assertJsonCount(3);
 
-        $this->assertCount(2, $response->decodeResponseJson());
-        $this->assertArrayHasKey('id', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('title', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('name', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('type', $response->decodeResponseJson()[0]);
-        $this->assertSame('Post', $response->decodeResponseJson('0.type'));
-        $this->assertArrayHasKey('route', $response->decodeResponseJson()[0]);
-        $this->assertSame('edit-post', $response->decodeResponseJson('0.route'));
+        $this->assertArrayHasKey('id', $response[0]);
+        $this->assertArrayHasKey('title', $response[0]);
+        $this->assertArrayHasKey('name', $response[0]);
+        $this->assertArrayHasKey('type', $response[0]);
+        $this->assertSame('Post', $response[0]['type']);
+        $this->assertArrayHasKey('route', $response[0]);
+        $this->assertSame('edit-post', $response[0]['route']);
     }
 
-    /** @test */
-    public function it_can_fetch_tags()
+    public function testAnEditorCanSearchAllPosts(): void
     {
-        $meta = factory(UserMeta::class)->create([
-            'admin' => 1,
+        factory(Post::class, 3)->create([
+            'user_id' => $this->editor->id,
         ]);
 
-        factory(Tag::class, 2)->create([
-            'user_id' => $meta->user->id,
+        factory(Post::class)->create([
+            'user_id' => $this->contributor->id,
         ]);
 
-        $response = $this->actingAs($meta->user)
+        $response = $this->actingAs($this->editor, 'canvas')
+                         ->getJson('canvas/api/search/posts')
+                         ->assertSuccessful()
+                         ->assertJsonCount(4);
+
+        $this->assertArrayHasKey('id', $response[0]);
+        $this->assertArrayHasKey('title', $response[0]);
+        $this->assertArrayHasKey('name', $response[0]);
+        $this->assertArrayHasKey('type', $response[0]);
+        $this->assertSame('Post', $response[0]['type']);
+        $this->assertArrayHasKey('route', $response[0]);
+        $this->assertSame('edit-post', $response[0]['route']);
+    }
+
+    public function testAnAdminCanSearchAllPosts(): void
+    {
+        factory(Post::class, 3)->create([
+            'user_id' => $this->editor->id,
+        ]);
+
+        factory(Post::class)->create([
+            'user_id' => $this->contributor->id,
+        ]);
+
+        $response = $this->actingAs($this->admin, 'canvas')
+                         ->getJson('canvas/api/search/posts')
+                         ->assertSuccessful()
+                         ->assertJsonCount(4);
+
+        $this->assertArrayHasKey('id', $response[0]);
+        $this->assertArrayHasKey('title', $response[0]);
+        $this->assertArrayHasKey('name', $response[0]);
+        $this->assertArrayHasKey('type', $response[0]);
+        $this->assertSame('Post', $response[0]['type']);
+        $this->assertArrayHasKey('route', $response[0]);
+        $this->assertSame('edit-post', $response[0]['route']);
+    }
+
+    public function testAnAdminCanSearchAllTags(): void
+    {
+        factory(Tag::class, 2)->create();
+
+        $response = $this->actingAs($this->admin, 'canvas')
                          ->getJson('canvas/api/search/tags')
-                         ->assertSuccessful();
+                         ->assertSuccessful()
+                         ->assertJsonCount(2);
 
-        $this->assertCount(2, $response->decodeResponseJson());
-        $this->assertArrayHasKey('id', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('name', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('type', $response->decodeResponseJson()[0]);
-        $this->assertSame('Tag', $response->decodeResponseJson('0.type'));
-        $this->assertArrayHasKey('route', $response->decodeResponseJson()[0]);
-        $this->assertSame('edit-tag', $response->decodeResponseJson('0.route'));
+        $this->assertArrayHasKey('id', $response[0]);
+        $this->assertArrayHasKey('name', $response[0]);
+        $this->assertArrayHasKey('type', $response[0]);
+        $this->assertSame('Tag', $response[0]['type']);
+        $this->assertArrayHasKey('route', $response[0]);
+        $this->assertSame('edit-tag', $response[0]['route']);
     }
 
-    /** @test */
-    public function it_can_fetch_topics()
+    public function testAnAdminCanSearchAllTopics(): void
     {
-        $meta = factory(UserMeta::class)->create([
-            'admin' => 1,
-        ]);
+        factory(Topic::class, 3)->create();
 
-        factory(Topic::class, 2)->create([
-            'user_id' => $meta->user->id,
-        ]);
-
-        $response = $this->actingAs($meta->user)
+        $response = $this->actingAs($this->admin, 'canvas')
                          ->getJson('canvas/api/search/topics')
-                         ->assertSuccessful();
+                         ->assertSuccessful()
+                         ->assertJsonCount(3);
 
-        $this->assertCount(2, $response->decodeResponseJson());
-        $this->assertArrayHasKey('id', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('name', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('type', $response->decodeResponseJson()[0]);
-        $this->assertSame('Topic', $response->decodeResponseJson('0.type'));
-        $this->assertArrayHasKey('route', $response->decodeResponseJson()[0]);
-        $this->assertSame('edit-topic', $response->decodeResponseJson('0.route'));
+        $this->assertArrayHasKey('id', $response[0]);
+        $this->assertArrayHasKey('name', $response[0]);
+        $this->assertArrayHasKey('type', $response[0]);
+        $this->assertSame('Topic', $response[0]['type']);
+        $this->assertArrayHasKey('route', $response[0]);
+        $this->assertSame('edit-topic', $response[0]['route']);
     }
 
-    /** @test */
-    public function it_can_fetch_users()
+    public function testAnAdminCanSearchAllUsers(): void
     {
-        $meta = factory(UserMeta::class)->create([
-            'admin' => 1,
-        ]);
-
-        factory(config('canvas.user'), 2)->create();
-
-        $response = $this->actingAs($meta->user)
+        $response = $this->actingAs($this->admin, 'canvas')
                          ->getJson('canvas/api/search/users')
-                         ->assertSuccessful();
+                         ->assertSuccessful()
+                         ->assertJsonCount(3);
 
-        $this->assertCount(3, $response->decodeResponseJson());
-        $this->assertArrayHasKey('id', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('name', $response->decodeResponseJson()[0]);
-        $this->assertArrayHasKey('type', $response->decodeResponseJson()[0]);
-        $this->assertSame('User', $response->decodeResponseJson('0.type'));
-        $this->assertArrayHasKey('route', $response->decodeResponseJson()[0]);
-        $this->assertSame('edit-user', $response->decodeResponseJson('0.route'));
+        $this->assertArrayHasKey('id', $response[0]);
+        $this->assertArrayHasKey('name', $response[0]);
+        $this->assertArrayHasKey('type', $response[0]);
+        $this->assertSame('User', $response[0]['type']);
+        $this->assertArrayHasKey('route', $response[0]);
+        $this->assertSame('edit-user', $response[0]['route']);
     }
 }

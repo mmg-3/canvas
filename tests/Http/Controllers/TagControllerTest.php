@@ -2,128 +2,147 @@
 
 namespace Canvas\Tests\Http\Controllers;
 
-use Canvas\Http\Middleware\Admin;
-use Canvas\Http\Middleware\Session;
 use Canvas\Models\Post;
 use Canvas\Models\Tag;
+use Canvas\Models\User;
 use Canvas\Models\View;
 use Canvas\Tests\TestCase;
-use Illuminate\Auth\Middleware\Authorize;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Ramsey\Uuid\Uuid;
 
+/**
+ * Class TagControllerTest.
+ *
+ * @covers \Canvas\Http\Controllers\TagController
+ * @covers \Canvas\Http\Requests\TagRequest
+ */
 class TagControllerTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @return void
-     */
-    protected function setUp(): void
+    public function testAnAdminCanFetchAllTags(): void
     {
-        parent::setUp();
-
-        $this->withoutMiddleware([
-            Authorize::class,
-            Admin::class,
-            Session::class,
-            VerifyCsrfToken::class,
+        $tag = factory(Tag::class)->create([
+            'user_id' => factory(User::class)->create([
+                'role' => User::ADMIN,
+            ]),
         ]);
 
-        $this->registerAssertJsonExactFragmentMacro();
-    }
+        factory(Tag::class, 4)->create();
 
-    /** @test */
-    public function it_can_fetch_tags()
-    {
-        $tag = factory(Tag::class)->create();
-
-        $this->actingAs($tag->user)
+        $this->actingAs($this->admin, 'canvas')
              ->getJson('canvas/api/tags')
              ->assertSuccessful()
-             ->assertJsonExactFragment($tag->id, 'data.0.id')
-             ->assertJsonExactFragment($tag->name, 'data.0.name')
-             ->assertJsonExactFragment($tag->user->id, 'data.0.user_id')
-             ->assertJsonExactFragment($tag->slug, 'data.0.slug')
-             ->assertJsonExactFragment($tag->posts->count(), 'data.0.posts_count')
-             ->assertJsonExactFragment(1, 'total');
+             ->assertJsonFragment([
+                 'id' => $tag->id,
+                 'name' => $tag->name,
+                 'user_id' => $tag->user->id,
+                 'slug' => $tag->slug,
+                 'posts_count' => (string) $tag->posts->count(),
+                 'total' => 5,
+             ]);
     }
 
-    /** @test */
-    public function it_can_fetch_a_new_tag()
+    public function testNewPostData(): void
     {
-        $user = factory(config('canvas.user'))->create();
-
-        $response = $this->actingAs($user)->getJson('canvas/api/tags/create')->assertSuccessful();
-
-        $this->assertArrayHasKey('id', $response->decodeResponseJson());
+        $this->actingAs($this->admin, 'canvas')
+             ->getJson('canvas/api/tags/create')
+             ->assertSuccessful()
+             ->assertJsonStructure([
+                 'id',
+             ]);
     }
 
-    /** @test */
-    public function it_can_fetch_an_existing_tag()
+    public function testExistingPostData(): void
     {
         $tag = factory(Tag::class)->create();
 
-        $this->actingAs($tag->user)
+        $this->actingAs($this->admin, 'canvas')
              ->getJson("canvas/api/tags/{$tag->id}")
              ->assertSuccessful()
-             ->assertJsonExactFragment($tag->id, 'id')
-             ->assertJsonExactFragment($tag->name, 'name')
-             ->assertJsonExactFragment($tag->user->id, 'user_id')
-             ->assertJsonExactFragment($tag->slug, 'slug');
+             ->assertJsonFragment([
+                 'id' => $tag->id,
+                 'name' => $tag->name,
+                 'user_id' => $tag->user->id,
+                 'slug' => $tag->slug,
+             ]);
     }
 
-    /** @test */
-    public function it_can_fetch_posts_for_an_existing_tag()
+    public function testPostsCanBeFetchedForATag(): void
     {
         $tag = factory(Tag::class)->create();
         $post = factory(Post::class)->create();
+
         factory(View::class)->create([
             'post_id' => $post->id,
         ]);
 
         $tag->posts()->sync([$post->id]);
 
-        $response = $this->actingAs($tag->user)
+        $this->actingAs($this->admin, 'canvas')
              ->getJson("canvas/api/tags/{$tag->id}/posts")
-             ->assertSuccessful();
-
-        $this->assertIsArray($response->decodeResponseJson('data'));
-        $this->assertCount(1, $response->decodeResponseJson('data'));
-        $this->assertArrayHasKey('views_count', $response->decodeResponseJson('data.0'));
-        $this->assertEquals(1, $response->decodeResponseJson('data.0.views_count'));
+             ->assertSuccessful()
+             ->assertJsonFragment([
+                 'tag_id' => $tag->id,
+                 'post_id' => $post->id,
+                 'views_count' => (string) $post->views->count(),
+             ]);
     }
 
-    /** @test */
-    public function it_returns_404_if_no_tag_is_found()
+    public function testTagNotFound(): void
     {
-        $user = factory(config('canvas.user'))->create();
-
-        $this->actingAs($user)->getJson('canvas/api/tags/not-a-tag')->assertNotFound();
+        $this->actingAs($this->admin, 'canvas')
+             ->getJson('canvas/api/tags/not-a-tag')
+             ->assertNotFound();
     }
 
-    /** @test */
-    public function it_can_create_a_new_tag()
+    public function testStoreNewTag(): void
     {
-        $user = factory(config('canvas.user'))->create();
-
         $data = [
             'id' => Uuid::uuid4()->toString(),
             'name' => 'A new tag',
             'slug' => 'a-new-tag',
         ];
 
-        $this->actingAs($user)
+        $this->actingAs($this->admin, 'canvas')
              ->postJson("canvas/api/tags/{$data['id']}", $data)
              ->assertSuccessful()
-             ->assertJsonExactFragment($data['name'], 'name')
-             ->assertJsonExactFragment($data['slug'], 'slug')
-             ->assertJsonExactFragment($user->id, 'user_id');
+             ->assertJsonFragment([
+                 'id' => $data['id'],
+                 'name' => $data['name'],
+                 'slug' => $data['slug'],
+                 'user_id' => $this->admin->id,
+             ]);
     }
 
-    /** @test */
-    public function it_can_update_an_existing_tag()
+    public function testADeletedTagCanBeRefreshed(): void
+    {
+        $deletedTag = factory(Tag::class)->create([
+            'id' => Uuid::uuid4()->toString(),
+            'name' => 'A deleted tag',
+            'slug' => 'a-deleted-tag',
+            'user_id' => $this->editor->id,
+            'deleted_at' => now(),
+        ]);
+
+        $data = [
+            'id' => Uuid::uuid4()->toString(),
+            'name' => $deletedTag->name,
+            'slug' => $deletedTag->slug,
+        ];
+
+        $this->actingAs($this->admin, 'canvas')
+             ->postJson("canvas/api/tags/{$data['id']}", $data)
+             ->assertSuccessful()
+             ->assertJsonFragment([
+                 'id' => $deletedTag->id,
+                 'name' => $deletedTag->name,
+                 'slug' => $deletedTag->slug,
+                 'user_id' => $deletedTag->user_id,
+             ]);
+    }
+
+    public function testUpdateExistingTag(): void
     {
         $tag = factory(Tag::class)->create();
 
@@ -132,42 +151,43 @@ class TagControllerTest extends TestCase
             'slug' => 'an-updated-tag',
         ];
 
-        $this->actingAs($tag->user)
+        $this->actingAs($this->admin, 'canvas')
              ->postJson("canvas/api/tags/{$tag->id}", $data)
              ->assertSuccessful()
-             ->assertJsonExactFragment($data['name'], 'name')
-             ->assertJsonExactFragment($data['slug'], 'slug')
-             ->assertJsonExactFragment($tag->user->id, 'user_id');
+             ->assertJsonFragment([
+                 'id' => $tag->id,
+                 'name' => $data['name'],
+                 'slug' => $data['slug'],
+                 'user_id' => $tag->user->id,
+             ]);
     }
 
-    /** @test */
-    public function it_will_not_store_an_invalid_slug()
+    public function testInvalidSlugsAreValidated(): void
     {
         $tag = factory(Tag::class)->create();
 
-        $response = $this->actingAs($tag->user)
-                         ->postJson("canvas/api/tags/{$tag->id}", [
-                             'name' => 'A new tag',
-                             'slug' => 'a new.slug',
-                         ])
-                         ->assertStatus(422);
-
-        $this->assertArrayHasKey('slug', $response->decodeResponseJson('errors'));
+        $this->actingAs($this->admin, 'canvas')
+             ->postJson("canvas/api/tags/{$tag->id}", [
+                 'name' => 'A new tag',
+                 'slug' => 'a new.slug',
+             ])
+             ->assertStatus(422)
+             ->assertJsonStructure([
+                 'errors' => [
+                     'slug',
+                 ],
+             ]);
     }
 
-    /** @test */
-    public function it_can_delete_a_tag()
+    public function testDeleteExistingTag(): void
     {
-        $tag = factory(Tag::class)->create([
-            'name' => 'A new tag',
-            'slug' => 'a-new-tag',
-        ]);
+        $tag = factory(Tag::class)->create();
 
-        $this->actingAs($tag->user)
+        $this->actingAs($this->admin, 'canvas')
              ->deleteJson('canvas/api/tags/not-a-tag')
              ->assertNotFound();
 
-        $this->actingAs($tag->user)
+        $this->actingAs($this->admin, 'canvas')
              ->deleteJson("canvas/api/tags/{$tag->id}")
              ->assertSuccessful()
              ->assertNoContent();
@@ -178,15 +198,10 @@ class TagControllerTest extends TestCase
         ]);
     }
 
-    /** @test */
-    public function it_can_de_sync_the_post_relationship()
+    public function testDeSyncPostRelationship(): void
     {
         $tag = factory(Tag::class)->create();
-
-        $post = factory(Post::class)->create([
-            'user_id' => $tag->user->id,
-            'slug' => 'a-new-post',
-        ]);
+        $post = factory(Post::class)->create();
 
         $tag->posts()->sync([$post->id]);
 
@@ -197,7 +212,10 @@ class TagControllerTest extends TestCase
 
         $this->assertCount(1, $tag->posts);
 
-        $this->actingAs($tag->user)->deleteJson("canvas/api/posts/{$post->id}")->assertSuccessful()->assertNoContent();
+        $this->actingAs($this->admin, 'canvas')
+             ->deleteJson("canvas/api/posts/{$post->id}")
+             ->assertSuccessful()
+             ->assertNoContent();
 
         $this->assertSoftDeleted('canvas_posts', [
             'id' => $post->id,

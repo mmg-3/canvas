@@ -4,23 +4,27 @@ namespace Canvas\Tests\Console;
 
 use Canvas\Mail\WeeklyDigest;
 use Canvas\Models\Post;
-use Canvas\Models\UserMeta;
+use Canvas\Models\User;
 use Canvas\Models\View;
 use Canvas\Models\Visit;
 use Canvas\Tests\TestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 
+/**
+ * Class DigestCommandTest.
+ *
+ * @covers \Canvas\Console\DigestCommand
+ */
 class DigestCommandTest extends TestCase
 {
-    /** @test */
-    public function it_can_send_the_weekly_digest()
+    use RefreshDatabase;
+
+    public function testDigestCommandWillSendAnEmailToUsersWithMailEnabled(): void
     {
         Mail::fake();
 
-        $user = factory(config('canvas.user'))->create();
-
-        factory(UserMeta::class)->create([
-            'user_id' => $user->id,
+        $user = factory(User::class)->create([
             'digest' => 1,
         ]);
 
@@ -60,15 +64,11 @@ class DigestCommandTest extends TestCase
         });
     }
 
-    /** @test */
-    public function it_will_not_send_an_email_if_digest_is_disabled()
+    public function testDigestCommandWillNotSendAnEmailToUsersWithMailDisabled(): void
     {
         Mail::fake();
 
-        $user = factory(config('canvas.user'))->create();
-
-        factory(UserMeta::class)->create([
-            'user_id' => $user->id,
+        $user = factory(User::class)->create([
             'digest' => 0,
         ]);
 

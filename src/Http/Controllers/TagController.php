@@ -2,11 +2,11 @@
 
 namespace Canvas\Http\Controllers;
 
+use Canvas\Http\Requests\TagRequest;
 use Canvas\Models\Tag;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Illuminate\Validation\Rule;
 use Ramsey\Uuid\Uuid;
 
 class TagController extends Controller
@@ -19,7 +19,8 @@ class TagController extends Controller
     public function index(): JsonResponse
     {
         return response()->json(
-            Tag::latest()
+            Tag::query()
+               ->latest()
                ->withCount('posts')
                ->paginate(), 200
         );
@@ -40,47 +41,29 @@ class TagController extends Controller
     /**
      * Store a newly created resource in storage.
      *
+     * @param TagRequest $request
      * @param $id
      * @return JsonResponse
      */
-    public function store($id): JsonResponse
+    public function store(TagRequest $request, $id): JsonResponse
     {
-        $tag = Tag::find($id);
+        $data = $request->validated();
+
+        $tag = Tag::query()->find($id);
 
         if (! $tag) {
-            if ($tag = Tag::onlyTrashed()->firstWhere('slug', request('slug'))) {
+            if ($tag = Tag::onlyTrashed()->firstWhere('slug', $data['slug'])) {
                 $tag->restore();
+
+                return response()->json($tag->refresh(), 201);
             } else {
                 $tag = new Tag(['id' => $id]);
             }
         }
 
-        $data = [
-            'id' => $id,
-            'name' => request('name'),
-            'slug' => request('slug'),
-            'user_id' => request()->user()->id,
-        ];
-
-        $rules = [
-            'name' => 'required',
-            'slug' => [
-                'required',
-                'alpha_dash',
-                Rule::unique('canvas_tags')->where(function ($query) use ($data) {
-                    return $query->where('slug', $data['slug'])->where('user_id', $data['user_id']);
-                })->ignore($id)->whereNull('deleted_at'),
-            ],
-        ];
-
-        $messages = [
-            'required' => trans('canvas::app.validation_required', [], optional($tag->userMeta)->locale),
-            'unique' => trans('canvas::app.validation_unique', [], optional($tag->userMeta)->locale),
-        ];
-
-        validator($data, $rules, $messages)->validate();
-
         $tag->fill($data);
+
+        $tag->user_id = $tag->user_id ?? request()->user('canvas')->id;
 
         $tag->save();
 
@@ -92,11 +75,10 @@ class TagController extends Controller
      *
      * @param $id
      * @return JsonResponse
-     * @throws Exception
      */
     public function show($id): JsonResponse
     {
-        $tag = Tag::find($id);
+        $tag = Tag::query()->find($id);
 
         return $tag ? response()->json($tag, 200) : response()->json(null, 404);
     }
@@ -106,11 +88,10 @@ class TagController extends Controller
      *
      * @param $id
      * @return JsonResponse
-     * @throws Exception
      */
     public function showPosts($id): JsonResponse
     {
-        $tag = Tag::with('posts')->find($id);
+        $tag = Tag::query()->with('posts')->find($id);
 
         return $tag ? response()->json($tag->posts()->withCount('views')->paginate(), 200) : response()->json(null, 200);
     }
@@ -120,10 +101,11 @@ class TagController extends Controller
      *
      * @param $id
      * @return mixed
+     * @throws Exception
      */
     public function destroy($id)
     {
-        $tag = Tag::findOrFail($id);
+        $tag = Tag::query()->findOrFail($id);
 
         $tag->delete();
 

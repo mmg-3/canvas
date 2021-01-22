@@ -1,6 +1,5 @@
+import { store } from '../store';
 import axios from 'axios';
-import store from '../store';
-import VueRouter from 'vue-router';
 
 export default {
     methods: {
@@ -10,7 +9,8 @@ export default {
             instance.defaults.headers.common['X-CSRF-TOKEN'] = document.head.querySelector(
                 'meta[name="csrf-token"]'
             ).content;
-            instance.defaults.baseURL = '/' + store.state.config.path;
+
+            instance.defaults.baseURL = store.state.settings.path;
 
             const requestHandler = (request) => {
                 // Add any request modifiers...
@@ -20,12 +20,14 @@ export default {
             const errorHandler = (error) => {
                 // Add any error modifiers...
                 switch (error.response.status) {
-                    case 404:
-                        VueRouter.push({ name: 'home' });
-                        break;
                     case 401:
                     case 405:
-                        window.location.href = '/';
+                        if (store.state.settings.path === '/') {
+                            window.location.href = `/logout`;
+                        } else {
+                            window.location.href = `${instance.defaults.baseURL}/logout`;
+                        }
+
                         break;
                     default:
                         break;

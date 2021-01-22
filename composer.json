@@ -1,12 +1,12 @@
 {
-    "name": "cnvs/canvas",
+    "name": "austintoddj/canvas",
     "description": "A Laravel publishing platform",
-    "keywords": ["canvas", "laravel", "publishing", "platform"],
+    "keywords": ["blog", "canvas", "laravel", "publishing", "platform"],
     "license": "MIT",
-    "homepage": "https://cnvs.io",
+    "homepage": "https://trycanvas.app",
     "support": {
-        "issues": "https://github.com/cnvs/canvas/issues",
-        "source": "https://github.com/cnvs/canvas"
+        "issues": "https://github.com/austintoddj/canvas/issues",
+        "source": "https://github.com/austintoddj/canvas"
     },
     "authors": [
         {
@@ -15,14 +15,15 @@
         }
     ],
     "require": {
-        "php": "^7.2",
+        "php": "^7.3|^8.0",
         "ext-json": "*",
-        "laravel/framework": "^6.0|^7.0"
+        "laravel/framework": "^6.0|^7.0|^8.0"
     },
     "require-dev": {
-        "mockery/mockery": "^1.3|^1.4",
-        "orchestra/testbench": "^4.0|^5.3",
-        "phpunit/phpunit": "^8.4|^9.2"
+        "laravel/legacy-factories": "^1.0",
+        "mockery/mockery": "^1.4",
+        "orchestra/testbench": "^4.0|^5.0|^6.0",
+        "phpunit/phpunit": "^9.0"
     },
     "autoload": {
         "psr-4": {
