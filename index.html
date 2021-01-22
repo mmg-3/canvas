@@ -434,11 +434,11 @@
         <div class="max-w-4xl mx-auto w-full -mt-16 pb-20">
             <div class="mx-4 flex flex-col md:flex-row md:justify-around bg-white rounded-lg shadow-lg">
                 <div class="flex-1 text-center p-4 border-b-2 md:border-b-0 md:border-r-2 border-gray-200">
-                    <h3 class="font-bold text-5xl text-gray-800" id="downloads">0</h3>
+                    <h3 class="font-bold text-5xl text-gray-800">41K</h3>
                     <p class="text-gray-600 font-semibold">Downloads</p>
                 </div>
                 <div class="flex-1 text-center p-4 border-b-2 md:border-b-0 md:border-r-2 border-gray-200">
-                    <h3 class="font-bold text-5xl text-gray-800" id="contributors">61+</h3>
+                    <h3 class="font-bold text-5xl text-gray-800">60+</h3>
                     <p class="text-gray-600 font-semibold">Contributors</p>
                 </div>
                 <div class="flex-1 text-center p-4">
@@ -459,27 +459,6 @@
 <script async src="https://www.googletagmanager.com/gtag/js?id=UA-80244014-1"></script>
 <script>
     window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','UA-80244014-1');
-</script>
-<script>
-    const reducer = (accumulator, currentValue) => accumulator + currentValue;
-
-    let currentDownloads = fetch('https://repo.packagist.org/packages/austintoddj/canvas.json')
-        .then(response => response.json())
-        .then(data => {
-            return data.package?.downloads?.total;
-        });
-
-    let legacyDownloads = fetch('https://repo.packagist.org/packages/cnvs/canvas.json')
-        .then(response => response.json())
-        .then(data => {
-            return data.package?.downloads?.total;
-        });
-
-    Promise.all([currentDownloads, legacyDownloads]).then((values) => {
-        let o = Intl.NumberFormat('en', { notation: 'compact' });
-        let downloads = values.reduce(reducer);
-        document.getElementById('downloads').innerHTML = o.format(downloads);
-    });
 </script>
 </body>
 </html>
